@@ -291,9 +291,10 @@ def main():
         pretrained=args.pretrained,
         num_classes=args.num_classes,
         drop_rate=args.drop,
-        drop_connect_rate=args.drop_connect,  # DEPRECATED, use drop_path
-        drop_path_rate=args.drop_path,
-        drop_block_rate=args.drop_block,
+        aux_logits=True,
+        # drop_connect_rate=args.drop_connect,  # DEPRECATED, use drop_path
+        # drop_path_rate=args.drop_path,
+        # drop_block_rate=args.drop_block,
         global_pool=args.gp,
         bn_tf=args.bn_tf,
         bn_momentum=args.bn_momentum,
@@ -583,8 +584,11 @@ def train_epoch(
                 input, target = mixup_fn(input, target)
 
         output = model(input)
-
-        loss = loss_fn(output, target)
+        if isinstance(output, tuple): # training has aux loss (note, this was not implemented in many pytorch code, only torchvision)
+            loss = loss_fn(output[0], target) + loss_fn(output[1], target) # ! aux loss
+        else: 
+            loss = loss_fn(output, target)
+            
         if not args.distributed:
             losses_m.update(loss.item(), input.size(0))
 

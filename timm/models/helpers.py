@@ -126,7 +126,11 @@ def load_pretrained(model, cfg=None, num_classes=1000, in_chans=3, filter_fn=Non
             conv1_weight = conv1_weight.to(conv1_type)
             state_dict[conv1_name + '.weight'] = conv1_weight
 
-    classifier_name = cfg['classifier']
+    classifier_name_tuple = ( cfg['classifier'] , ) # make tuple 
+    if cfg.pop ( 'has_aux', False ) : 
+        classifier_name_tuple = classifier_name_tuple + ('AuxLogits.fc', ) ## add AuxLogits for inception
+        
+    classifier_name = classifier_name_tuple[0] ## first element is cfg['classifier']
     if num_classes == 1000 and cfg['num_classes'] == 1001:
         # special case for imagenet trained models with extra background class in pretrained weights
         classifier_weight = state_dict[classifier_name + '.weight']
@@ -135,9 +139,13 @@ def load_pretrained(model, cfg=None, num_classes=1000, in_chans=3, filter_fn=Non
         state_dict[classifier_name + '.bias'] = classifier_bias[1:]
     elif num_classes != cfg['num_classes']:
         # completely discard fully connected for all other differences between pretrained and created model
-        del state_dict[classifier_name + '.weight']
-        del state_dict[classifier_name + '.bias']
+        # del state_dict[classifier_name + '.weight']
+        # del state_dict[classifier_name + '.bias']
         strict = False
+        # auxilary loss, and possibly more ?
+        for classifier_name in classifier_name_tuple :
+            del state_dict[classifier_name + '.weight']
+            del state_dict[classifier_name + '.bias']
 
     model.load_state_dict(state_dict, strict=strict)
 
