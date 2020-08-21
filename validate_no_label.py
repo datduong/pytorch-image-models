@@ -309,10 +309,9 @@ def main():
     else:
         r, prediction = validate(args)
         # ! write out prediction
-        results_file = results_file.split('/')
-        results_file [-1] = 'prediction.pickle' # replace last part, keep same dir
-        results_file = '/' + '/'.join(s for s in results_file)
-        pickle.dump(prediction, open(results_file,'wb'))
+        import HAM10000
+        HAM10000.helper.save_output_csv(prediction, [], results_file)
+
 
 
 def write_results(results_file, results):

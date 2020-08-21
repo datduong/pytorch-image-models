@@ -550,6 +550,10 @@ def main():
                     model, optimizer, args,
                     epoch=epoch, model_ema=model_ema, metric=save_metric, use_amp=use_amp)
 
+            # early stop
+            if epoch - best_epoch > 10: 
+                _logger.info('*** Best metric: {0} (epoch {1}) (current epoch {2}'.format(best_metric, best_epoch, epoch))
+
     except KeyboardInterrupt:
         pass
     if best_metric is not None:

@@ -1,0 +1,52 @@
+
+
+import os,sys,re,pickle
+import numpy as np 
+import pandas as pd 
+
+
+def convert_score_01_range (x,a,b=0.5): 
+  # Diagnosis confidences are expressed as floating-point values in the closed interval [0.0, 1.0], where 0.5 is used as the binary classification threshold. Note that arbitrary score ranges and thresholds can be converted to the range of 0.0 to 1.0, with a threshold of 0.5, trivially using the following sigmoid conversion:
+
+  # 1 / (1 + e^(-(a(x - b))))
+  # where x is the original score, b is the binary threshold, and a is a scaling parameter (i.e. the inverse measured standard deviation on a held-out dataset). Predicted responses should set the binary threshold b to a value where the classification system is expected to achieve 89% sensitivity, although this is not required.
+
+  # 1 / (1 + e^(-(a(x - b))))
+  return 1 / (1 + np.exp(-((x - b)/a)))
+
+
+def reorder_col (inputs,pytorch_label=['akiec', 'bcc', 'bkl', 'df', 'mel', 'nv', 'vasc']): 
+  # File columns must be:
+  # image: an input image identifier of the form ISIC_
+  # MEL: “Melanoma” diagnosis confidence
+  # NV: “Melanocytic nevus” diagnosis confidence
+  # BCC: “Basal cell carcinoma” diagnosis confidence
+  # AKIEC: “Actinic keratosis / Bowen’s disease (intraepithelial carcinoma)” diagnosis confidence
+  # BKL: “Benign keratosis (solar lentigo / seborrheic keratosis / lichen planus-like keratosis)” diagnosis confidence
+  # DF: “Dermatofibroma” diagnosis confidence
+  # VASC: “Vascular lesion” diagnosis confidence
+
+  # ! pytorch sort label by alphabet, so we need to reorder 
+  gold_label_order = ['mel','nv','bcc','akiec','bkl','df','vasc']
+  new_order = [ pytorch_label.index(i) for i in gold_label_order ]
+  return inputs[ : , new_order ] # swap col
+
+
+def save_output_csv(prediction, obs_name, output_name): 
+  prediction = reorder_col(prediction)
+  num_sample = prediction.shape[0]
+  a_each_row = np.std(prediction,axis=1).reshape ( (num_sample,1)) # reshape to do broadcast
+  output = convert_score_01_range(prediction,a_each_row)
+  fout = open ( output_name , 'w' )
+  if len(obs_name) > 0 :
+    fout.write('image,MEL,NV,BCC,AKIEC,BKL,DF,VASC\n')
+    for index,name in enumerate(obs_name): 
+      fout.write(name+','+ ','.join ( str(x) for x in output[index] ) + '\n')
+    # 
+  else: 
+    fout.write('MEL,NV,BCC,AKIEC,BKL,DF,VASC\n')
+    for index in np.arange(prediction.shape[0]): 
+      fout.write(','.join ( str(x) for x in output[index] ) + '\n')
+    # 
+  fout.close() 
+  
