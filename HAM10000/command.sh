@@ -9,6 +9,10 @@ sbatch --partition=gpu --time=3-12:00:00 --gres=gpu:k80:1 --mem=8g -c8 Efficient
 
 sbatch --partition=gpu --time=3-12:00:00 --gres=gpu:k80:1 --mem=8g -c8 EfficientnetB0wt.sh
 
+sbatch --partition=gpu --time=3-12:00:00 --gres=gpu:k80:1 --mem=8g -c8 EfficientnetB1.sh
+
+sbatch --partition=gpu --time=3-12:00:00 --gres=gpu:k80:1 --mem=8g -c8 EfficientnetB1wt.sh
+
 sbatch --partition=gpu --time=3-12:00:00 --gres=gpu:p100:1 --mem=8g -c8 InceptionV3.sh
 
 sbatch --partition=gpu --time=3-12:00:00 --gres=gpu:p100:2 --mem=8g -c8 InceptionV3wt.sh
@@ -16,4 +20,4 @@ sbatch --partition=gpu --time=3-12:00:00 --gres=gpu:p100:2 --mem=8g -c8 Inceptio
 
 # -------------------------------- interactive ------------------------------- #
 
-sinteractive --partition=gpu --gres=gpu:k80:1 --mem=8g -c8
+sinteractive --partition=gpu --gres=gpu:k80:1 --mem=6g -c6

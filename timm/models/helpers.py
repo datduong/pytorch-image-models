@@ -142,8 +142,7 @@ def load_pretrained(model, cfg=None, num_classes=1000, in_chans=3, filter_fn=Non
         # del state_dict[classifier_name + '.weight']
         # del state_dict[classifier_name + '.bias']
         strict = False
-        # auxilary loss, and possibly more ?
-        for classifier_name in classifier_name_tuple :
+        for classifier_name in classifier_name_tuple : # auxilary loss, and possibly more ?
             del state_dict[classifier_name + '.weight']
             del state_dict[classifier_name + '.bias']
 

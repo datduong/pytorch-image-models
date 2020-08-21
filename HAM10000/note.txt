@@ -1,0 +1,33 @@
+
+
+apply_test_time_pool average feature 3D-tensor, run fc --> num_label, then do max_pool to get highest prediction
+
+
+DEFAULT_CROP_PCT = 0.875 
+scale_size = int(math.floor(img_size / crop_pct)) # crop_pct<1 means that scale_size>img_size, so we enlarge image, then crop it back to @img_size
+--> set crop_pct=1
+
+
+need to remove centercrop ? 
+
+
+python3 train.py $data_path --model efficientnet_b0 -b $batchsize --sched step --epochs 450 --decay-epochs 2.4 --decay-rate .97 --opt rmsproptf --opt-eps .001 -j 8 --warmup-lr 1e-6 --weight-decay 1e-5 --drop 0.2 --drop-connect 0.2 --model-ema --model-ema-decay 0.9999 --aa rand-m9-mstd0.5 --remode pixel --reprob 0.2 --amp --lr .048 --pretrained --num-classes 7 --output $output 
+
+
+
+# data_path=/data/duongdb/HAM10000dataset/ImagesLabelFolderRandomSplit/ # train/valid
+data_path=/data/duongdb/HAM10000dataset/ISIC2018_Task3_Test_Input/transform/ # test
+batchsize=64
+cd /data/duongdb/pytorch-image-models
+base_path=/data/duongdb/HAM10000dataset/efficientnet_b0/train/
+train_name='20200819-191527-efficientnet_b0-224'
+output=$base_path/$train_name/result_test.csv # path/name.csv
+checkpoint=$base_path/$train_name/model_best.pth.tar
+# call pretrained to bring in model again ?? probalby not have to
+# python3 validate.py $data_path --model efficientnet_b0 -b $batchsize -j 4 --img-size 224 --crop-pct 1 --num-classes 7 --results-file $output --checkpoint $checkpoint --no-test-pool --amp --use-ema
+
+python3 validate_no_label.py $data_path --model efficientnet_b0 -b $batchsize -j 4 --img-size 224 --crop-pct 1 --num-classes 7 --results-file $output --checkpoint $checkpoint --no-test-pool --amp --use-ema
+
+
+
+tf-preprocessing
