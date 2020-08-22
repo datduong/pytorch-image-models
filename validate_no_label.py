@@ -309,8 +309,8 @@ def main():
     else:
         r, prediction = validate(args)
         # ! write out prediction
-        import HAM10000
-        HAM10000.helper.save_output_csv(prediction, [], results_file)
+        from HAM10000 import helper
+        helper.save_output_csv(prediction, [], results_file)
 
 
 
