@@ -233,8 +233,13 @@ parser.add_argument("--local_rank", default=0, type=int)
 parser.add_argument('--use-multi-epochs-loader', action='store_true', default=False,
                     help='use the multi-epochs-loader to save time at the beginning of every epoch')
 
-# add weighted cross entropy ?
-parser.add_argument("--weighted_cross_entropy", default=None, type=str)
+# my own params
+parser.add_argument("--weighted_cross_entropy", default=None, type=str,
+                    help='weight each label class')
+parser.add_argument("--classification_layer_name", default=None, type=str,
+                    help='if not None, we set base params with lower learning rate')
+parser.add_argument("--filter_bias_and_bn", action='store_true', default=False,
+                    help='remove bias and batchnorm from weight decay, hardcode=True in original code, so remember to always use it')
 
 
 def _parse_args():
@@ -324,7 +329,10 @@ def main():
     else:
         model.cuda()
 
-    optimizer = create_optimizer(args, model)
+    if args.classification_layer_name is not None: 
+        args.classification_layer_name = args.classification_layer_name.strip().split()
+        print ('classification_layer_name {}'.format(args.classification_layer_name))
+    optimizer = create_optimizer(args, model, filter_bias_and_bn=args.filter_bias_and_bn, classification_layer_name=args.classification_layer_name)
 
     use_amp = False
     if has_apex and args.amp:

@@ -10,6 +10,7 @@ try:
 except ImportError:
     has_apex = False
 
+import re
 
 def add_weight_decay(model, weight_decay=1e-5, skip_list=()):
     decay = []
@@ -26,7 +27,42 @@ def add_weight_decay(model, weight_decay=1e-5, skip_list=()):
         {'params': decay, 'weight_decay': weight_decay}]
 
 
-def create_optimizer(args, model, filter_bias_and_bn=True):
+def set_lr_per_params(args, model, last_layer_list, weight_decay=1e-5, skip_list=()): 
+    # return {param1: lr, params2}
+    # separate params of base model from last classification layer
+    # follow @add_weight_decay
+    base_params_decay = []
+    base_params_no_decay = []
+    last_layer_params_decay = []
+    last_layer_params_no_decay = []
+    last_layer_param_name = []
+    for name, param in model.named_parameters():
+        if not param.requires_grad:
+            continue  # frozen weights
+        for layer in last_layer_list: 
+            if re.match(layer,name): # ! last classification layer
+                if len(param.shape) == 1 or name.endswith(".bias") or name in skip_list:
+                    last_layer_params_no_decay.append(param)
+                    last_layer_param_name.append(name)
+                else:
+                    last_layer_params_decay.append(param)
+                    last_layer_param_name.append(name)
+            else: # ! base layer
+                if len(param.shape) == 1 or name.endswith(".bias") or name in skip_list:
+                    base_params_no_decay.append(param)
+                else:
+                    base_params_decay.append(param)
+    # 
+    print ('last_layer_param_name {}'.format(last_layer_param_name))
+    return [
+        {'params': last_layer_params_no_decay, 'weight_decay': 0.},
+        {'params': last_layer_params_decay, 'weight_decay': weight_decay}, 
+        {'params': base_params_no_decay, 'weight_decay': 0., 'lr': args.lr/10}, # lower base param lr by 10x based on their paper
+        {'params': base_params_decay, 'weight_decay': weight_decay, 'lr': args.lr/10} ]
+     
+    
+
+def create_optimizer(args, model, filter_bias_and_bn=True, classification_layer_name=None):
     opt_lower = args.opt.lower()
     weight_decay = args.weight_decay
     if 'adamw' in opt_lower or 'radam' in opt_lower:
@@ -34,11 +70,17 @@ def create_optimizer(args, model, filter_bias_and_bn=True):
         # I don't believe they follow the paper or original Torch7 impl which schedules weight
         # decay based on the ratio of current_lr/initial_lr
         weight_decay /= args.lr
-    if weight_decay and filter_bias_and_bn:
-        parameters = add_weight_decay(model, weight_decay)
+    if weight_decay and filter_bias_and_bn: # batch norm and bias params
+        if classification_layer_name is not None : 
+            parameters = set_lr_per_params (args, model, classification_layer_name, weight_decay)
+        else: 
+            parameters = add_weight_decay(model, weight_decay)
         weight_decay = 0.
     else:
-        parameters = model.parameters()
+        if classification_layer_name is not None: 
+            parameters = set_lr_per_params (args, model, classification_layer_name, weight_decay=0)
+        else: 
+            parameters = model.parameters()
 
     if 'fused' in opt_lower:
         assert has_apex and torch.cuda.is_available(), 'APEX and CUDA required for fused optimizers'

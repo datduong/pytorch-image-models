@@ -1,0 +1,8 @@
+
+
+seems like it's very hard to train with weight class
+lr 0.001 seems to do okay, but will overfit pretty soon (after 30 epochs)
+right now, we update everything (not different lr rates for base model)
+
+
+** why the valid top 1 is very high, but evaluation on test is low ?? 86% top1 vs. 66% accuracy ?  
