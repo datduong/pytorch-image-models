@@ -89,6 +89,10 @@ parser.add_argument('--real-labels', default='', type=str, metavar='FILENAME',
 parser.add_argument('--valid-labels', default='', type=str, metavar='FILENAME',
                     help='Valid label indices txt file for validation of partial label space')
 
+parser.add_argument('--average_augment', action='store_true', default=False,
+                    help='average augmentation of each test sample')
+
+
 
 def set_jit_legacy():
     """ Set JIT executor to legacy w/ support for op fusion
@@ -310,7 +314,9 @@ def main():
         r, prediction = validate(args)
         # ! write out prediction
         from HAM10000 import helper
-        helper.save_output_csv(prediction, [], results_file)
+        if args.average_augment: 
+            results_file = re.sub (r'\.csv', '', results_file ) + '-ave-aug.csv'
+        helper.save_output_csv(prediction, [], results_file, average_augment=args.average_augment)
 
 
 

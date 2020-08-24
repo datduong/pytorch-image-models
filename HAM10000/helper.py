@@ -32,11 +32,21 @@ def reorder_col (inputs,pytorch_label=['akiec', 'bcc', 'bkl', 'df', 'mel', 'nv',
   return inputs[ : , new_order ] # swap col
 
 
-def save_output_csv(prediction, obs_name, output_name): 
+def average_over_augmentation (output,default_aug_num=10) : 
+  new_output = np.zeros( ( output.shape[0]//default_aug_num , 7 ) ) # must be divisible by @default_aug_num
+  for i in range(new_output.shape[0]): 
+    new_output[i] = np.mean( output[ i*10 : (i+1)*10 ] , axis=0 )
+  return new_output
+
+
+def save_output_csv(prediction, obs_name, output_name, average_augment=False): 
   prediction = reorder_col(prediction)
   num_sample = prediction.shape[0]
   a_each_row = np.std(prediction,axis=1).reshape ( (num_sample,1)) # reshape to do broadcast
   output = convert_score_01_range(prediction,a_each_row)
+  if average_augment : # ! take average over all augmentations 
+    output = average_over_augmentation (output)
+  #
   fout = open ( output_name , 'w' )
   if len(obs_name) > 0 :
     fout.write('image,MEL,NV,BCC,AKIEC,BKL,DF,VASC\n')
@@ -45,7 +55,7 @@ def save_output_csv(prediction, obs_name, output_name):
     # 
   else: 
     fout.write('MEL,NV,BCC,AKIEC,BKL,DF,VASC\n')
-    for index in np.arange(prediction.shape[0]): 
+    for index in np.arange(output.shape[0]): 
       fout.write(','.join ( str(x) for x in output[index] ) + '\n')
     # 
   fout.close() 

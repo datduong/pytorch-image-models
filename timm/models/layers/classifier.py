@@ -25,6 +25,33 @@ def create_classifier(num_features, num_classes, pool_type='avg', use_conv=False
     return global_pool, fc
 
 
+def create_classifier_layerfc(num_features, num_classes, pool_type='avg', use_conv=False):
+    flatten = not use_conv  # flatten when we use a Linear layer after pooling
+    if not pool_type:
+        assert num_classes == 0 or use_conv,\
+            'Pooling can only be disabled if classifier is also removed or conv classifier is used'
+        flatten = False  # disable flattening if pooling is pass-through (no pooling)
+    global_pool = SelectAdaptivePool2d(pool_type=pool_type, flatten=flatten)
+    num_pooled_features = num_features * global_pool.feat_mult()
+    if num_classes <= 0:
+        fc = nn.Identity()  # pass-through (no classifier)
+    elif use_conv:
+        fc = nn.Conv2d(num_pooled_features, num_classes, 1, bias=True)
+    else:
+        fc = nn.Sequential (    nn.BatchNorm1d(num_pooled_features), # ! follow baseline paper
+                                nn.Dropout(0.3),
+                                nn.Linear(num_pooled_features, 64), 
+                                nn.BatchNorm1d(64),
+                                nn.Dropout(0.3), 
+                                nn.Linear(64,num_classes) )
+        for i in range ( len(fc) ): 
+            if isinstance ( fc[i] , nn.Linear ): 
+                nn.init.xavier_uniform_ ( fc[i].weight )
+                nn.init.constant( fc[i].bias , 0)
+                
+    return global_pool, fc
+
+
 class ClassifierHead(nn.Module):
     """Classifier head w/ configurable global pooling and dropout."""
 

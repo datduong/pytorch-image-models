@@ -30,6 +30,8 @@ except ImportError:
 
 from timm.data import Dataset, create_loader, resolve_data_config, Mixup, FastCollateMixup, AugMixDataset
 from timm.models import create_model, resume_checkpoint, convert_splitbn_model
+from timm.models.layers.classifier import create_classifier_layerfc
+
 from timm.utils import *
 from timm.loss import LabelSmoothingCrossEntropy, SoftTargetCrossEntropy, JsdCrossEntropy
 from timm.optim import create_optimizer
@@ -38,6 +40,7 @@ from timm.scheduler import create_scheduler
 import torch
 import torch.nn as nn
 import torchvision.utils
+
 
 torch.backends.cudnn.benchmark = True
 _logger = logging.getLogger('train')
@@ -240,6 +243,8 @@ parser.add_argument("--classification_layer_name", default=None, type=str,
                     help='if not None, we set base params with lower learning rate')
 parser.add_argument("--filter_bias_and_bn", action='store_true', default=False,
                     help='remove bias and batchnorm from weight decay, hardcode=True in original code, so remember to always use it')
+parser.add_argument("--create_classifier_layerfc", action='store_true', default=False,
+                    help='add more layers to classification layer')
 
 
 def _parse_args():
@@ -291,6 +296,7 @@ def main():
 
     torch.manual_seed(args.seed + args.rank)
 
+    # ! build model
     model = create_model(
         args.model,
         pretrained=args.pretrained,
@@ -305,6 +311,10 @@ def main():
         bn_eps=args.bn_eps,
         checkpoint_path=args.initial_checkpoint)
 
+    # ! add more layer to classifier layer
+    if args.create_classifier_layerfc: 
+        model.global_pool, model.classifier = create_classifier_layerfc(model.num_features, model.num_classes)
+        
     if args.local_rank == 0:
         _logger.info('Model %s created, param count: %d' %
                      (args.model, sum([m.numel() for m in model.parameters()])))
@@ -329,6 +339,7 @@ def main():
     else:
         model.cuda()
 
+    # ! optimizer
     if args.classification_layer_name is not None: 
         args.classification_layer_name = args.classification_layer_name.strip().split()
         print ('classification_layer_name {}'.format(args.classification_layer_name))
