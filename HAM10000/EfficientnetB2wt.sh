@@ -3,7 +3,7 @@
 
 data_path=/data/duongdb/HAM10000dataset/ImagesLabelFolderRandomSplit/
 output=/data/duongdb/HAM10000dataset/efficientnet_b2/
-batchsize=64
+batchsize=128 # takes 8gb with 64, so we can do more
 
 cd /data/duongdb/pytorch-image-models
 

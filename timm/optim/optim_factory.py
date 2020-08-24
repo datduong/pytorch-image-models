@@ -60,7 +60,6 @@ def set_lr_per_params(args, model, last_layer_list, weight_decay=1e-5, skip_list
         {'params': base_params_no_decay, 'weight_decay': 0., 'lr': args.lr/10}, # lower base param lr by 10x based on their paper
         {'params': base_params_decay, 'weight_decay': weight_decay, 'lr': args.lr/10} ]
      
-    
 
 def create_optimizer(args, model, filter_bias_and_bn=True, classification_layer_name=None):
     opt_lower = args.opt.lower()
