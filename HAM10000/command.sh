@@ -7,7 +7,7 @@ sbatch --partition=gpu --time=2-00:00:00 --gres=gpu:p100:1 --mem=8g -c4 Efficien
 
 sbatch --partition=gpu --time=3-12:00:00 --gres=gpu:k80:1 --mem=8g -c8 EfficientnetB0.sh
 
-sbatch --partition=gpu --time=2-00:00:00 --gres=gpu:p100:1 --mem=8g -c4 EfficientnetB0wt.sh
+sbatch --partition=gpu --time=2-00:00:00 --gres=gpu:k80:1 --mem=8g -c4 EfficientnetB0wt.sh
 
 sbatch --partition=gpu --time=2-00:00:00 --gres=gpu:p100:1 --mem=8g -c4 EfficientnetB0wtlayer.sh
 

@@ -28,6 +28,8 @@ except ImportError:
     has_apex = False
 
 from timm.models import create_model, apply_test_time_pool, load_checkpoint, is_model, list_models
+from timm.models.layers.classifier import create_classifier_layerfc
+
 from timm.data import Dataset, DatasetTar, create_loader, resolve_data_config, RealLabelsImagenet
 from timm.utils import accuracy, AverageMeter, natural_key, setup_default_logging
 
@@ -89,8 +91,11 @@ parser.add_argument('--real-labels', default='', type=str, metavar='FILENAME',
 parser.add_argument('--valid-labels', default='', type=str, metavar='FILENAME',
                     help='Valid label indices txt file for validation of partial label space')
 
+# ! my own args
 parser.add_argument('--average_augment', action='store_true', default=False,
                     help='average augmentation of each test sample')
+parser.add_argument("--create_classifier_layerfc", action='store_true', default=False,
+                    help='add more layers to classification layer')
 
 
 
@@ -121,6 +126,10 @@ def validate(args):
         num_classes=args.num_classes,
         in_chans=3,
         scriptable=args.torchscript)
+
+    # ! add more layer to classifier layer
+    if args.create_classifier_layerfc: 
+        model.global_pool, model.classifier = create_classifier_layerfc(model.num_features, model.num_classes)
 
     if args.checkpoint:
         load_checkpoint(model, args.checkpoint, args.use_ema)

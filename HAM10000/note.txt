@@ -11,6 +11,16 @@ scale_size = int(math.floor(img_size / crop_pct)) # crop_pct<1 means that scale_
 need to remove centercrop ? 
 
 
+data transform already applied. color_jitter is applied, so brightness is already applied. 
+this is done by --aa command --> so we don't need to do any predcompute ?? 
+
+data augmentation transformation is done on the fly. 
+
+use no-resume-opt gives bad result 
+
+--
+
+
 python3 train.py $data_path --model efficientnet_b0 -b $batchsize --sched step --epochs 450 --decay-epochs 2.4 --decay-rate .97 --opt rmsproptf --opt-eps .001 -j 8 --warmup-lr 1e-6 --weight-decay 1e-5 --drop 0.2 --drop-connect 0.2 --model-ema --model-ema-decay 0.9999 --aa rand-m9-mstd0.5 --remode pixel --reprob 0.2 --amp --lr .048 --pretrained --num-classes 7 --output $output 
 
 
