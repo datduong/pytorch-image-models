@@ -233,4 +233,6 @@ def create_transform(
                 std=std,
                 crop_pct=crop_pct)
 
+    print ('transform used')
+    print (transform)
     return transform

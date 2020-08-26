@@ -9,7 +9,7 @@ sbatch --partition=gpu --time=3-12:00:00 --gres=gpu:k80:1 --mem=8g -c8 Efficient
 
 sbatch --partition=gpu --time=2-00:00:00 --gres=gpu:k80:1 --mem=8g -c4 EfficientnetB0wt.sh
 
-sbatch --partition=gpu --time=2-00:00:00 --gres=gpu:p100:1 --mem=8g -c4 EfficientnetB0wtlayer.sh
+sbatch --partition=gpu --time=2-00:00:00 --gres=gpu:k80:1 --mem=8g -c4 EfficientnetB0wtlayer.sh
 
 sbatch --partition=gpu --time=3-12:00:00 --gres=gpu:k80:1 --mem=8g -c8 EfficientnetB1.sh
 
@@ -25,3 +25,5 @@ sbatch --partition=gpu --time=3-12:00:00 --gres=gpu:p100:2 --mem=8g -c8 Inceptio
 # -------------------------------- interactive ------------------------------- #
 
 sinteractive --partition=gpu --gres=gpu:k80:1 --mem=6g -c6
+
+sbatch --partition=gpu --time=2-00:00:00 --gres=gpu:k80:1 --mem=8g -c4 efficientnet_b0.0.sh

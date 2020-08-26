@@ -318,7 +318,7 @@ class AugmentOp:
 
     def __init__(self, name, prob=0.5, magnitude=10, hparams=None):
         hparams = hparams or _HPARAMS_DEFAULT
-        self.aug_fn = NAME_TO_OP[name]
+        self.aug_fn = NAME_TO_OP[name]  # ! take an operation @NAME_TO_OP apply to @img
         self.level_fn = LEVEL_TO_ARG[name]
         self.prob = prob
         self.magnitude = magnitude

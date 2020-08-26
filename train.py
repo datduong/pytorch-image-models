@@ -245,6 +245,8 @@ parser.add_argument("--filter_bias_and_bn", action='store_true', default=False,
                     help='remove bias and batchnorm from weight decay, hardcode=True in original code, so remember to always use it')
 parser.add_argument("--create_classifier_layerfc", action='store_true', default=False,
                     help='add more layers to classification layer')
+parser.add_argument('--last_layer_weight_decay', type=float, default=0.0001,
+                    help='weight decay in the last layer (default: 0.0001)')
 
 
 def _parse_args():
@@ -455,7 +457,7 @@ def main():
         hflip=args.hflip,
         vflip=args.vflip,
         color_jitter=args.color_jitter,
-        auto_augment=args.aa,
+        auto_augment=args.aa, # ! see file auto_augment.py
         num_aug_splits=num_aug_splits,
         interpolation=train_interpolation,
         mean=data_config['mean'],
