@@ -441,6 +441,7 @@ def main():
     train_interpolation = args.train_interpolation
     if args.no_aug or not train_interpolation:
         train_interpolation = data_config['interpolation']
+    
     loader_train = create_loader(
         dataset_train,
         input_size=data_config['input_size'],
@@ -480,7 +481,7 @@ def main():
     loader_eval = create_loader(
         dataset_eval,
         input_size=data_config['input_size'],
-        batch_size=args.validation_batch_size_multiplier * args.batch_size,
+        batch_size=args.validation_batch_size_multiplier * args.batch_size, # ! so we can eval faster
         is_training=False,
         use_prefetcher=args.prefetcher,
         interpolation=data_config['interpolation'],
@@ -510,7 +511,7 @@ def main():
     else:    
         train_loss_fn = nn.CrossEntropyLoss(weight=weighted_cross_entropy).cuda()
             
-    validate_loss_fn = nn.CrossEntropyLoss().cuda() # eval as usual ? weight=weighted_cross_entropy
+    validate_loss_fn = nn.CrossEntropyLoss().cuda() # ! eval as usual ? weight=weighted_cross_entropy
 
     eval_metric = args.eval_metric
     best_metric = None
@@ -571,8 +572,9 @@ def main():
                     epoch=epoch, model_ema=model_ema, metric=save_metric, use_amp=use_amp)
 
             # early stop
-            if epoch - best_epoch > 10: 
+            if epoch - best_epoch > 5: 
                 _logger.info('*** Best metric: {0} (epoch {1}) (current epoch {2}'.format(best_metric, best_epoch, epoch))
+                break # ! exit
                 
 
     except KeyboardInterrupt:
