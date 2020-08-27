@@ -17,6 +17,9 @@ python3 validate_no_label.py $data_path --model efficientnet_b2 -b $batchsize -j
 
 
 # ! do test 
+
+sinteractive --partition=gpu --gres=gpu:k80:1 --mem=4g -c4
+
 # data_path=/data/duongdb/HAM10000dataset/ImagesLabelFolderRandomSplit/ # train/valid
 data_path=/data/duongdb/HAM10000dataset/ISIC2018_Task3_Test_Input/original/ # test
 # data_path=/data/duongdb/HAM10000dataset/ISIC2018_Task3_Test_Input/transform/ # test
@@ -24,7 +27,7 @@ data_path=/data/duongdb/HAM10000dataset/ISIC2018_Task3_Test_Input/original/ # te
 batchsize=64
 cd /data/duongdb/pytorch-image-models
 base_path=/data/duongdb/HAM10000dataset/efficientnet_b0/train/
-train_name='20200825-193738-efficientnet_b0-224'
+train_name='20200827-115944-efficientnet_b0-224'
 
 # ! average check point 
 # python3 avg_checkpoints.py --input $base_path/$train_name --output $base_path/$train_name/averaged.pth
@@ -33,8 +36,9 @@ train_name='20200825-193738-efficientnet_b0-224'
 output=$base_path/$train_name/result_test.csv # path/name.csv
 checkpoint=$base_path/$train_name/averaged.pth # model_best.pth.tar
 
-python3 validate_no_label.py $data_path --model efficientnet_b0 -b $batchsize -j 2 --num-classes 7 --results-file $output --checkpoint $checkpoint --amp --use-ema --create_classifier_layerfc
+python3 validate_no_label.py $data_path --model efficientnet_b0 -b $batchsize -j 2 --config $base_path/$train_name/args.yaml --num-classes 7 --results-file $output --checkpoint $checkpoint --amp --use-ema 
 
 # average_augment
+# --aa original
 
 cd $base_path/$train_name

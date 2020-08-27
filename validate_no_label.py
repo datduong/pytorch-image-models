@@ -7,11 +7,13 @@ canonical PyTorch, standard Python style, and good performance. Repurpose as you
 
 Hacked together by Ross Wightman (https://github.com/rwightman)
 """
+import sys
 import argparse
 import os
 import csv
 import glob
 import time
+import yaml
 import logging
 import torch
 import torch.nn as nn
@@ -19,7 +21,7 @@ import torch.nn.parallel
 from collections import OrderedDict
 
 import numpy as np
-import re, pickle
+import re, pickle, random
 
 try:
     from apex import amp
@@ -36,8 +38,16 @@ from timm.utils import accuracy, AverageMeter, natural_key, setup_default_loggin
 torch.backends.cudnn.benchmark = True
 _logger = logging.getLogger('validate')
 
+# The first arg parser parses out only the --config argument, this argument is used to
+# load a yaml file containing key-values that override the defaults for the main parser below
+config_parser = parser = argparse.ArgumentParser(description='Training Config, we will use them for evaluation', add_help=False)
+parser.add_argument('-c', '--config', default='', type=str, metavar='FILE',
+                    help='YAML config file specifying default arguments')
 
-parser = argparse.ArgumentParser(description='PyTorch ImageNet Validation')
+
+parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
+
+# Dataset / Model parameters
 parser.add_argument('data', metavar='DIR',
                     help='path to dataset')
 parser.add_argument('--model', '-m', metavar='MODEL', default='dpn92',
@@ -92,11 +102,18 @@ parser.add_argument('--valid-labels', default='', type=str, metavar='FILENAME',
                     help='Valid label indices txt file for validation of partial label space')
 
 # ! my own args
-parser.add_argument('--average_augment', action='store_true', default=False,
+parser.add_argument('--ave_precompute_aug', action='store_true', default=False,
                     help='average augmentation of each test sample')
-parser.add_argument("--create_classifier_layerfc", action='store_true', default=False,
-                    help='add more layers to classification layer')
-
+# parser.add_argument("--create_classifier_layerfc", action='store_true', default=False,
+#                     help='add more layers to classification layer')
+# parser.add_argument("--aug_eval_data", action='store_true', default=False,
+#                     help='on-the-fly aug of eval data')
+parser.add_argument("--aug_eval_data_num", type=int, default=50,
+                    help='how many data aug, and average them')
+# parser.add_argument('--aa', type=str, default=None, metavar='NAME',
+#                     help='Use AutoAugment policy. "v0" or "original". (default: None)')
+parser.add_argument('--seed', type=int, default=1, metavar='S',
+                    help='random seed (default: 42)')
 
 
 def set_jit_legacy():
@@ -110,6 +127,24 @@ def set_jit_legacy():
     torch._C._jit_set_profiling_mode(False)
     torch._C._jit_override_can_fuse_on_gpu(True)
     #torch._C._jit_set_texpr_fuser_enabled(True)
+
+
+
+def _parse_args():
+    # Do we have a config file to parse?
+    args_config, remaining = config_parser.parse_known_args()
+    if args_config.config:
+        with open(args_config.config, 'r') as f:
+            cfg = yaml.safe_load(f)
+            parser.set_defaults(**cfg)
+
+    # The main arg parser parses the rest of the args, the usual
+    # defaults will have been overridden if config file specified.
+    args = parser.parse_args(remaining)
+
+    # Cache the args as a text string to save them in the output dir later
+    args_text = yaml.safe_dump(args.__dict__, default_flow_style=False)
+    return args, args_text
 
 
 def validate(args):
@@ -152,7 +187,7 @@ def validate(args):
     if args.num_gpu > 1:
         model = torch.nn.DataParallel(model, device_ids=list(range(args.num_gpu)))
 
-    criterion = nn.CrossEntropyLoss().cuda()
+    # criterion = nn.CrossEntropyLoss().cuda() # ! don't have gold label
 
     if os.path.splitext(args.data)[1] == '.tar' and os.path.isfile(args.data):
         dataset = DatasetTar(args.data, load_bytes=args.tf_preprocessing, class_map=args.class_map)
@@ -172,6 +207,7 @@ def validate(args):
         real_labels = None
 
     crop_pct = 1.0 if test_time_pool else data_config['crop_pct']
+
     loader = create_loader(
         dataset,
         input_size=data_config['input_size'],
@@ -183,7 +219,14 @@ def validate(args):
         num_workers=args.workers,
         crop_pct=crop_pct,
         pin_memory=args.pin_mem,
-        tf_preprocessing=args.tf_preprocessing)
+        tf_preprocessing=args.tf_preprocessing,
+        auto_augment=args.aa,
+        scale=args.scale,
+        ratio=args.ratio,
+        hflip=args.hflip,
+        vflip=args.vflip,
+        color_jitter=args.color_jitter,
+        aug_eval_data=args.aug_eval_data) # ! do same data augmentation as train data, so we can eval on many test aug. images
 
     batch_time = AverageMeter()
     losses = AverageMeter()
@@ -207,6 +250,9 @@ def validate(args):
 
             # compute output
             output = model(input)
+            if isinstance(output, (tuple, list)):
+                output = output[0] # ! some model returns both loss + aux loss
+            
             if valid_labels is not None:
                 output = output[:, valid_labels] # ! keep only valid labels ? good to eval by class.
 
@@ -266,7 +312,17 @@ def validate(args):
 
 def main():
     setup_default_logging()
-    args = parser.parse_args()
+
+    args, args_text = _parse_args()
+    # args = parser.parse_args()
+
+    if args.ave_precompute_aug and args.aug_eval_data: 
+        sys.exit ('check args.ave_precompute_aug and args.aug_eval_data, only 1 can be true ')
+
+    torch.manual_seed(args.seed) # ! mostly for aug on test
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    
     model_cfgs = []
     model_names = []
     if os.path.isdir(args.checkpoint):
@@ -319,13 +375,27 @@ def main():
         results = sorted(results, key=lambda x: x['top1'], reverse=True)
         if len(results):
             write_results(results_file, results)
-    else:
-        r, prediction = validate(args)
-        # ! write out prediction
+    else:  
+          
         from HAM10000 import helper
-        if args.average_augment: 
+        
+        if args.ave_precompute_aug: # ! we pre-compute data aug on test set
             results_file = re.sub (r'\.csv', '', results_file ) + '-ave-aug.csv'
-        helper.save_output_csv(prediction, [], results_file, average_augment=args.average_augment)
+            r, prediction = validate(args)
+        elif args.aug_eval_data: # ! do augmentation on-the-fly
+            prediction = None
+            for i in range(args.aug_eval_data_num) : 
+                r, prediction_i = validate(args)
+                if prediction is None: 
+                    prediction = prediction_i
+                else: 
+                    prediction = prediction + prediction_i
+            # average
+            prediction = prediction / args.aug_eval_data_num
+        else: 
+            r, prediction = validate(args)
+
+        helper.save_output_csv(prediction, [], results_file, average_augment=args.ave_precompute_aug)
 
 
 

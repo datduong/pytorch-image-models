@@ -145,7 +145,7 @@ parser.add_argument('--vflip', type=float, default=0.,
 parser.add_argument('--color-jitter', type=float, default=0.4, metavar='PCT',
                     help='Color jitter factor (default: 0.4)')
 parser.add_argument('--aa', type=str, default=None, metavar='NAME',
-                    help='Use AutoAugment policy. "v0" or "original". (default: None)'),
+                    help='Use AutoAugment policy. "v0" or "original". (default: None)')
 parser.add_argument('--aug-splits', type=int, default=0,
                     help='Number of augmentation splits (default: 0, valid: 0 or >=2)')
 parser.add_argument('--jsd', action='store_true', default=False,
@@ -242,7 +242,7 @@ parser.add_argument("--weighted_cross_entropy", default=None, type=str,
 parser.add_argument("--weighted_cross_entropy_eval", action='store_true', default=False,
                     help='add more layers to classification layer')
 parser.add_argument("--aug_eval_data", action='store_true', default=False,
-                    help='add more layers to classification layer')
+                    help='on-the-fly aug of eval data')
 parser.add_argument("--classification_layer_name", default=None, type=str,
                     help='if not None, we set base params with lower learning rate')
 parser.add_argument("--filter_bias_and_bn", action='store_true', default=False,
@@ -251,6 +251,10 @@ parser.add_argument("--create_classifier_layerfc", action='store_true', default=
                     help='add more layers to classification layer')
 parser.add_argument('--last_layer_weight_decay', type=float, default=0.0001,
                     help='weight decay in the last layer (default: 0.0001)') 
+parser.add_argument('--early_stop_counter', type=int, default=50,
+                    help='after we see best epoch, how many later epochs to wait before exit') 
+parser.add_argument('--topk', type=int, default=2,
+                    help='highest topk') 
 
 
 
@@ -522,7 +526,8 @@ def main():
             distributed=args.distributed,
             collate_fn=collate_fn,
             pin_memory=args.pin_mem,
-            use_multi_epochs_loader=args.use_multi_epochs_loader
+            use_multi_epochs_loader=args.use_multi_epochs_loader,
+            shuffle=False # ! no shuffle for eval set ... well doesn't matter really duing training
         )
     else: 
         loader_eval = create_loader(
@@ -577,7 +582,7 @@ def main():
         ])
         output_dir = get_outdir(output_base, 'train', exp_name)
         decreasing = True if eval_metric == 'loss' else False
-        saver = CheckpointSaver(checkpoint_dir=output_dir, decreasing=decreasing)
+        saver = CheckpointSaver(checkpoint_dir=output_dir, decreasing=decreasing, max_history=5)
         with open(os.path.join(output_dir, 'args.yaml'), 'w') as f:
             f.write(args_text)
 
@@ -622,7 +627,7 @@ def main():
                     epoch=epoch, model_ema=model_ema, metric=save_metric, use_amp=use_amp)
 
             # early stop
-            if epoch - best_epoch > 20: 
+            if epoch - best_epoch > args.early_stop_counter : 
                 _logger.info('*** Best metric: {0} (epoch {1}) (current epoch {2}'.format(best_metric, best_epoch, epoch))
                 break # ! exit
                 
@@ -764,7 +769,7 @@ def validate(model, loader, loss_fn, args, log_suffix=''):
                 target = target[0:target.size(0):reduce_factor]
 
             loss = loss_fn(output, target)
-            acc1, acc5 = accuracy(output, target, topk=(1, 5))
+            acc1, acc5 = accuracy(output, target, topk=(1, args.topk))
 
             if args.distributed:
                 reduced_loss = reduce_tensor(loss.data, args.world_size)
@@ -792,7 +797,7 @@ def validate(model, loader, loss_fn, args, log_suffix=''):
                         log_name, batch_idx, last_idx, batch_time=batch_time_m,
                         loss=losses_m, top1=top1_m, top5=top5_m))
 
-    metrics = OrderedDict([('loss', losses_m.avg), ('top1', top1_m.avg), ('top5', top5_m.avg)])
+    metrics = OrderedDict([('loss', losses_m.avg), ('top1', top1_m.avg), ('top'+str(args.topk), top5_m.avg)])
 
     return metrics
 

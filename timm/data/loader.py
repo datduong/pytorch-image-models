@@ -154,7 +154,8 @@ def create_loader(
         fp16=False,
         tf_preprocessing=False,
         use_multi_epochs_loader=False, 
-        shuffle=None
+        shuffle=None, 
+        aug_eval_data=False
     ):
     
     re_num_splits = 0
@@ -183,6 +184,7 @@ def create_loader(
         re_count=re_count,
         re_num_splits=re_num_splits,
         separate=num_aug_splits > 0,
+        aug_eval_data=aug_eval_data
     )
 
     sampler = None

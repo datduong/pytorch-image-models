@@ -164,6 +164,75 @@ def transforms_imagenet_eval(
     return transforms.Compose(tfl)
 
 
+def transforms_imagenet_eval_aug(
+        img_size=224,
+        crop_pct=None,
+        interpolation='bilinear',
+        use_prefetcher=False,
+        mean=IMAGENET_DEFAULT_MEAN,
+        std=IMAGENET_DEFAULT_STD, 
+        auto_augment=None, 
+        scale=None,
+        ratio=None,
+        hflip=0.5,
+        vflip=0.,
+        color_jitter=None):
+    
+    scale = tuple(scale or (0.08, 1.0))  # default imagenet scale range
+    ratio = tuple(ratio or (3./4., 4./3.))  # default imagenet ratio range
+    primary_tfl = [
+        RandomResizedCropAndInterpolation(img_size, scale=scale, ratio=ratio, interpolation=interpolation)]
+    if hflip > 0.:
+        primary_tfl += [transforms.RandomHorizontalFlip(p=hflip)]
+    if vflip > 0.:
+        primary_tfl += [transforms.RandomVerticalFlip(p=vflip)]
+
+    secondary_tfl = [] # ! added aug just like train set
+    if auto_augment:
+        assert isinstance(auto_augment, str)
+        if isinstance(img_size, tuple):
+            img_size_min = min(img_size)
+        else:
+            img_size_min = img_size
+        aa_params = dict(
+            translate_const=int(img_size_min * 0.45),
+            img_mean=tuple([min(255, round(255 * x)) for x in mean]),
+        )
+        if interpolation and interpolation != 'random':
+            aa_params['interpolation'] = _pil_interp(interpolation)
+        if auto_augment.startswith('rand'):
+            secondary_tfl += [rand_augment_transform(auto_augment, aa_params)]
+        elif auto_augment.startswith('augmix'):
+            aa_params['translate_pct'] = 0.3
+            secondary_tfl += [augment_and_mix_transform(auto_augment, aa_params)]
+        else:
+            secondary_tfl += [auto_augment_transform(auto_augment, aa_params)]
+    elif color_jitter is not None:
+        # color jitter is enabled when not using AA
+        if isinstance(color_jitter, (list, tuple)):
+            # color jitter should be a 3-tuple/list if spec brightness/contrast/saturation
+            # or 4 if also augmenting hue
+            assert len(color_jitter) in (3, 4)
+        else:
+            # if it's a scalar, duplicate for brightness, contrast, and saturation, no hue
+            color_jitter = (float(color_jitter),) * 3
+        secondary_tfl += [transforms.ColorJitter(*color_jitter)]
+
+    tfl = [] 
+    if use_prefetcher:
+        # prefetcher and collate will handle tensor conversion and norm
+        tfl += [ToNumpy()]
+    else:
+        tfl += [
+            transforms.ToTensor(),
+            transforms.Normalize(
+                    mean=torch.tensor(mean),
+                    std=torch.tensor(std))
+        ]
+
+    return transforms.Compose(primary_tfl + secondary_tfl + tfl)
+
+
 def create_transform(
         input_size,
         is_training=False,
@@ -184,7 +253,8 @@ def create_transform(
         re_num_splits=0,
         crop_pct=None,
         tf_preprocessing=False,
-        separate=False):
+        separate=False, 
+        aug_eval_data=False):
 
     if isinstance(input_size, tuple):
         img_size = input_size[-2:]
@@ -225,13 +295,29 @@ def create_transform(
                 separate=separate)
         else:
             assert not separate, "Separate transforms not supported for validation preprocessing"
-            transform = transforms_imagenet_eval(
-                img_size,
-                interpolation=interpolation,
-                use_prefetcher=use_prefetcher,
-                mean=mean,
-                std=std,
-                crop_pct=crop_pct)
+            if aug_eval_data : # ! data aug on eval data
+                transform = transforms_imagenet_eval_aug( 
+                    img_size,
+                    interpolation=interpolation,
+                    use_prefetcher=use_prefetcher,
+                    mean=mean,
+                    std=std,
+                    crop_pct=crop_pct,
+                    auto_augment=auto_augment, 
+                    scale=scale,
+                    ratio=ratio,
+                    hflip=hflip,
+                    vflip=vflip,
+                    color_jitter=color_jitter)
+            else: 
+                transform = transforms_imagenet_eval(
+                    img_size,
+                    interpolation=interpolation,
+                    use_prefetcher=use_prefetcher,
+                    mean=mean,
+                    std=std,
+                    crop_pct=crop_pct)
+            
 
     print ('transform used')
     print (transform)
