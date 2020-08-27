@@ -153,7 +153,8 @@ def create_loader(
         pin_memory=False,
         fp16=False,
         tf_preprocessing=False,
-        use_multi_epochs_loader=False
+        use_multi_epochs_loader=False, 
+        shuffle=None
     ):
     
     re_num_splits = 0
@@ -201,10 +202,13 @@ def create_loader(
     if use_multi_epochs_loader:
         loader_class = MultiEpochsDataLoader
 
+    if shuffle is None: # ! take @shuffle so we can apply same data aug. on test set.
+        shuffle = sampler is None and is_training
+    
     loader = loader_class(
         dataset,
         batch_size=batch_size,
-        shuffle=sampler is None and is_training,
+        shuffle=shuffle,
         num_workers=num_workers,
         sampler=sampler,
         collate_fn=collate_fn,

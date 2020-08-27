@@ -198,7 +198,7 @@ def validate(args):
         input = torch.randn((args.batch_size,) + data_config['input_size']).cuda()
         model(input)
         end = time.time()
-        for batch_idx, (input, target) in enumerate(loader): #! not have real label  
+        for batch_idx, (input, target) in enumerate(loader): # ! not have real label  
             if args.no_prefetcher:
                 target = target.cuda()
                 input = input.cuda()
