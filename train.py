@@ -239,6 +239,10 @@ parser.add_argument('--use-multi-epochs-loader', action='store_true', default=Fa
 # my own params
 parser.add_argument("--weighted_cross_entropy", default=None, type=str,
                     help='weight each label class')
+parser.add_argument("--weighted_cross_entropy_eval", action='store_true', default=False,
+                    help='add more layers to classification layer')
+parser.add_argument("--aug_eval_data", action='store_true', default=False,
+                    help='add more layers to classification layer')
 parser.add_argument("--classification_layer_name", default=None, type=str,
                     help='if not None, we set base params with lower learning rate')
 parser.add_argument("--filter_bias_and_bn", action='store_true', default=False,
@@ -246,7 +250,8 @@ parser.add_argument("--filter_bias_and_bn", action='store_true', default=False,
 parser.add_argument("--create_classifier_layerfc", action='store_true', default=False,
                     help='add more layers to classification layer')
 parser.add_argument('--last_layer_weight_decay', type=float, default=0.0001,
-                    help='weight decay in the last layer (default: 0.0001)')
+                    help='weight decay in the last layer (default: 0.0001)') 
+
 
 
 def _parse_args():
@@ -299,19 +304,32 @@ def main():
     torch.manual_seed(args.seed + args.rank)
 
     # ! build model
-    model = create_model(
-        args.model,
-        pretrained=args.pretrained,
-        num_classes=args.num_classes,
-        drop_rate=args.drop,
-        drop_connect_rate=args.drop_connect,  # DEPRECATED, use drop_path
-        drop_path_rate=args.drop_path,
-        drop_block_rate=args.drop_block,
-        global_pool=args.gp,
-        bn_tf=args.bn_tf,
-        bn_momentum=args.bn_momentum,
-        bn_eps=args.bn_eps,
-        checkpoint_path=args.initial_checkpoint)
+    if 'inception' in args.model: 
+        model = create_model(
+            args.model,
+            pretrained=args.pretrained,
+            num_classes=args.num_classes,
+            drop_rate=args.drop,
+            aux_logits=True, # ! add aux loss
+            global_pool=args.gp,
+            bn_tf=args.bn_tf,
+            bn_momentum=args.bn_momentum,
+            bn_eps=args.bn_eps,
+            checkpoint_path=args.initial_checkpoint)
+    else: 
+        model = create_model(
+            args.model,
+            pretrained=args.pretrained,
+            num_classes=args.num_classes,
+            drop_rate=args.drop,
+            drop_connect_rate=args.drop_connect,  # DEPRECATED, use drop_path
+            drop_path_rate=args.drop_path,
+            drop_block_rate=args.drop_block,
+            global_pool=args.gp,
+            bn_tf=args.bn_tf,
+            bn_momentum=args.bn_momentum,
+            bn_eps=args.bn_eps,
+            checkpoint_path=args.initial_checkpoint)
 
     # ! add more layer to classifier layer
     if args.create_classifier_layerfc: 
@@ -478,20 +496,49 @@ def main():
             exit(1)
     dataset_eval = Dataset(eval_dir)
 
-    loader_eval = create_loader(
-        dataset_eval,
-        input_size=data_config['input_size'],
-        batch_size=args.validation_batch_size_multiplier * args.batch_size, # ! so we can eval faster
-        is_training=False,
-        use_prefetcher=args.prefetcher,
-        interpolation=data_config['interpolation'],
-        mean=data_config['mean'],
-        std=data_config['std'],
-        num_workers=args.workers,
-        distributed=args.distributed,
-        crop_pct=data_config['crop_pct'],
-        pin_memory=args.pin_mem,
-    )
+    if args.aug_eval_data : # ! do same data augmentation as train data, so we can eval on test aug.
+        loader_eval = create_loader(
+            dataset_eval,
+            input_size=data_config['input_size'],
+            batch_size=args.batch_size,
+            is_training=True,
+            use_prefetcher=args.prefetcher,
+            no_aug=args.no_aug,
+            re_prob=args.reprob,
+            re_mode=args.remode,
+            re_count=args.recount,
+            re_split=args.resplit,
+            scale=args.scale,
+            ratio=args.ratio,
+            hflip=args.hflip,
+            vflip=args.vflip,
+            color_jitter=args.color_jitter,
+            auto_augment=args.aa, # ! see file auto_augment.py
+            num_aug_splits=num_aug_splits,
+            interpolation=train_interpolation,
+            mean=data_config['mean'],
+            std=data_config['std'],
+            num_workers=args.workers,
+            distributed=args.distributed,
+            collate_fn=collate_fn,
+            pin_memory=args.pin_mem,
+            use_multi_epochs_loader=args.use_multi_epochs_loader
+        )
+    else: 
+        loader_eval = create_loader(
+            dataset_eval,
+            input_size=data_config['input_size'],
+            batch_size=args.validation_batch_size_multiplier * args.batch_size, # ! so we can eval faster
+            is_training=False,
+            use_prefetcher=args.prefetcher,
+            interpolation=data_config['interpolation'],
+            mean=data_config['mean'],
+            std=data_config['std'],
+            num_workers=args.workers,
+            distributed=args.distributed,
+            crop_pct=data_config['crop_pct'],
+            pin_memory=args.pin_mem,
+        )
 
     # add weighted loss for each label class
     if args.weighted_cross_entropy is None: 
@@ -510,8 +557,11 @@ def main():
         train_loss_fn = LabelSmoothingCrossEntropy(smoothing=args.smoothing).cuda()
     else:    
         train_loss_fn = nn.CrossEntropyLoss(weight=weighted_cross_entropy).cuda()
-            
-    validate_loss_fn = nn.CrossEntropyLoss().cuda() # ! eval as usual ? weight=weighted_cross_entropy
+
+    if args.weighted_cross_entropy_eval: 
+        validate_loss_fn = nn.CrossEntropyLoss(weight=weighted_cross_entropy).cuda()
+    else: 
+        validate_loss_fn = nn.CrossEntropyLoss().cuda() # ! eval as usual ? weight=weighted_cross_entropy
 
     eval_metric = args.eval_metric
     best_metric = None
@@ -572,7 +622,7 @@ def main():
                     epoch=epoch, model_ema=model_ema, metric=save_metric, use_amp=use_amp)
 
             # early stop
-            if epoch - best_epoch > 5: 
+            if epoch - best_epoch > 10: 
                 _logger.info('*** Best metric: {0} (epoch {1}) (current epoch {2}'.format(best_metric, best_epoch, epoch))
                 break # ! exit
                 
@@ -612,7 +662,13 @@ def train_epoch(
 
         output = model(input)
 
-        loss = loss_fn(output, target)
+        # ! for inception, or any type of aux loss 
+        if isinstance(output, tuple): # training has aux loss (note, this was not implemented in many pytorch code, only torchvision)
+            loss = loss_fn(output[0], target) + loss_fn(output[1], target) # ! aux loss
+        else: 
+            loss = loss_fn(output, target)
+
+
         if not args.distributed:
             losses_m.update(loss.item(), input.size(0))
 
