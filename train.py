@@ -496,12 +496,12 @@ def main():
             exit(1)
     dataset_eval = Dataset(eval_dir)
 
-    if args.aug_eval_data : # ! do same data augmentation as train data, so we can eval on test aug.
+    if args.aug_eval_data : # ! do same data augmentation as train data, so we can eval on many test aug. images
         loader_eval = create_loader(
             dataset_eval,
             input_size=data_config['input_size'],
             batch_size=args.batch_size,
-            is_training=True,
+            is_training=True, # ! set true, so we do same type of aug on eval set
             use_prefetcher=args.prefetcher,
             no_aug=args.no_aug,
             re_prob=args.reprob,
@@ -622,7 +622,7 @@ def main():
                     epoch=epoch, model_ema=model_ema, metric=save_metric, use_amp=use_amp)
 
             # early stop
-            if epoch - best_epoch > 10: 
+            if epoch - best_epoch > 20: 
                 _logger.info('*** Best metric: {0} (epoch {1}) (current epoch {2}'.format(best_metric, best_epoch, epoch))
                 break # ! exit
                 
