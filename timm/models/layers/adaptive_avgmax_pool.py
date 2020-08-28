@@ -77,7 +77,7 @@ class SelectAdaptivePool2d(nn.Module):
         if pool_type == '':
             self.pool = nn.Identity()  # pass through
         elif pool_type == 'avg':
-            self.pool = nn.AdaptiveAvgPool2d(output_size)
+            self.pool = nn.AdaptiveAvgPool2d(output_size) # ! output_size=1 is same as pytorch https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py#L157
         elif pool_type == 'avgmax':
             self.pool = AdaptiveAvgMaxPool2d(output_size)
         elif pool_type == 'catavgmax':

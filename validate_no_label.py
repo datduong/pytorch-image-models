@@ -102,18 +102,14 @@ parser.add_argument('--valid-labels', default='', type=str, metavar='FILENAME',
                     help='Valid label indices txt file for validation of partial label space')
 
 # ! my own args
+parser.add_argument("--has_eval_label", action='store_true', default=False,
+                    help='on-the-fly aug of eval data')
 parser.add_argument('--ave_precompute_aug', action='store_true', default=False,
                     help='average augmentation of each test sample')
-# parser.add_argument("--create_classifier_layerfc", action='store_true', default=False,
-#                     help='add more layers to classification layer')
-# parser.add_argument("--aug_eval_data", action='store_true', default=False,
-#                     help='on-the-fly aug of eval data')
-parser.add_argument("--aug_eval_data_num", type=int, default=50,
+parser.add_argument("--aug_eval_data_num", type=int, default=50, # ! aug_eval_data should be "on" in training
                     help='how many data aug, and average them')
-# parser.add_argument('--aa', type=str, default=None, metavar='NAME',
-#                     help='Use AutoAugment policy. "v0" or "original". (default: None)')
 parser.add_argument('--seed', type=int, default=1, metavar='S',
-                    help='random seed (default: 42)')
+                    help='random seed')
 
 
 def set_jit_legacy():
@@ -155,12 +151,21 @@ def validate(args):
         set_jit_legacy()
 
     # create model
-    model = create_model(
-        args.model,
-        pretrained=args.pretrained,
-        num_classes=args.num_classes,
-        in_chans=3,
-        scriptable=args.torchscript)
+    if 'inception' in args.model: 
+        model = create_model(
+            args.model,
+            pretrained=args.pretrained,
+            num_classes=args.num_classes,
+            aux_logits=True, # ! add aux loss
+            in_chans=3,
+            scriptable=args.torchscript)
+    else: 
+        model = create_model(
+            args.model,
+            pretrained=args.pretrained,
+            num_classes=args.num_classes,
+            in_chans=3,
+            scriptable=args.torchscript)
 
     # ! add more layer to classifier layer
     if args.create_classifier_layerfc: 
@@ -187,7 +192,8 @@ def validate(args):
     if args.num_gpu > 1:
         model = torch.nn.DataParallel(model, device_ids=list(range(args.num_gpu)))
 
-    # criterion = nn.CrossEntropyLoss().cuda() # ! don't have gold label
+    if args.has_eval_label: 
+        criterion = nn.CrossEntropyLoss().cuda() # ! don't have gold label
 
     if os.path.splitext(args.data)[1] == '.tar' and os.path.isfile(args.data):
         dataset = DatasetTar(args.data, load_bytes=args.tf_preprocessing, class_map=args.class_map)
@@ -263,39 +269,42 @@ def validate(args):
             else: # stack
                 prediction = np.concatenate ( (prediction, output.cpu().data.numpy() ) , axis=0 )
                 
-            # loss = criterion(output, target) # ! don't have gold standard on testset
-
+            
             if real_labels is not None:
                 real_labels.add_result(output)
 
-            # measure accuracy and record loss
-            # acc1, acc5 = accuracy(output.data, target, topk=(1, 5))
-            # losses.update(loss.item(), input.size(0))
-            # top1.update(acc1.item(), input.size(0))
-            # top5.update(acc5.item(), input.size(0))
+            if args.has_eval_label: 
+                # measure accuracy and record loss
+                loss = criterion(output, target) # ! don't have gold standard on testset
+                acc1, acc5 = accuracy(output.data, target, topk=(1, 5))
+                losses.update(loss.item(), input.size(0))
+                top1.update(acc1.item(), input.size(0))
+                top5.update(acc5.item(), input.size(0))
 
             # measure elapsed time
             batch_time.update(time.time() - end)
             end = time.time()
 
-            # if batch_idx % args.log_freq == 0:
-            #     _logger.info(
-            #         'Test: [{0:>4d}/{1}]  '
-            #         'Time: {batch_time.val:.3f}s ({batch_time.avg:.3f}s, {rate_avg:>7.2f}/s)  '
-            #         'Loss: {loss.val:>7.4f} ({loss.avg:>6.4f})  '
-            #         'Acc@1: {top1.val:>7.3f} ({top1.avg:>7.3f})  '
-            #         'Acc@5: {top5.val:>7.3f} ({top5.avg:>7.3f})'.format(
-            #             batch_idx, len(loader), batch_time=batch_time,
-            #             rate_avg=input.size(0) / batch_time.avg,
-            #             loss=losses, top1=top1, top5=top5))
+            if args.has_eval_label and (batch_idx % args.log_freq == 0):
+                _logger.info(
+                    'Test: [{0:>4d}/{1}]  '
+                    'Time: {batch_time.val:.3f}s ({batch_time.avg:.3f}s, {rate_avg:>7.2f}/s)  '
+                    'Loss: {loss.val:>7.4f} ({loss.avg:>6.4f})  '
+                    'Acc@1: {top1.val:>7.3f} ({top1.avg:>7.3f})  '
+                    'Acc@topk: {top5.val:>7.3f} ({top5.avg:>7.3f})'.format(
+                        batch_idx, len(loader), batch_time=batch_time,
+                        rate_avg=input.size(0) / batch_time.avg,
+                        loss=losses, top1=top1, top5=top5))
 
-    if real_labels is not None:
-        # real labels mode replaces topk values at the end
-        top1a, top5a = real_labels.get_accuracy(k=1), real_labels.get_accuracy(k=5)
-    else:
-        # top1a, top5a = top1.avg, top5.avg
+    if not args.has_eval_label: 
         top1a, top5a = 0, 0 # just dummy, because we don't know ground labels
-        
+    else:
+        if real_labels is not None:
+            # real labels mode replaces topk values at the end
+            top1a, top5a = real_labels.get_accuracy(k=1), real_labels.get_accuracy(k=args.topk)
+        else:
+            top1a, top5a = top1.avg, top5.avg
+
     results = OrderedDict(
         top1=round(top1a, 4), top1_err=round(100 - top1a, 4),
         top5=round(top5a, 4), top5_err=round(100 - top5a, 4),
@@ -396,6 +405,8 @@ def main():
             r, prediction = validate(args)
 
         helper.save_output_csv(prediction, [], results_file, average_augment=args.ave_precompute_aug)
+
+        # ! check validity of conversion to 0-1 range
 
 
 

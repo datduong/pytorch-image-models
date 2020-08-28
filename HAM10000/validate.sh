@@ -26,17 +26,17 @@ data_path=/data/duongdb/HAM10000dataset/ISIC2018_Task3_Test_Input/original/ # te
 # data_path=/data/duongdb/HAM10000dataset/ISIC2018_Task3_Test_Input/AugmentTransform/ # test
 batchsize=64
 cd /data/duongdb/pytorch-image-models
-base_path=/data/duongdb/HAM10000dataset/efficientnet_b0/train/
-train_name='20200827-115944-efficientnet_b0-224'
+base_path=/data/duongdb/HAM10000dataset/inception_v3/train/
+train_name='20200827-125645-inception_v3-299'
 
 # ! average check point 
 # python3 avg_checkpoints.py --input $base_path/$train_name --output $base_path/$train_name/averaged.pth
 
 
 output=$base_path/$train_name/result_test.csv # path/name.csv
-checkpoint=$base_path/$train_name/averaged.pth # model_best.pth.tar
+checkpoint=$base_path/$train_name/model_best.pth.tar # model_best.pth.tar averaged.pth 
 
-python3 validate_no_label.py $data_path --model efficientnet_b0 -b $batchsize -j 2 --config $base_path/$train_name/args.yaml --num-classes 7 --results-file $output --checkpoint $checkpoint --amp --use-ema 
+python3 validate_no_label.py $data_path --model inception_v3 -b $batchsize -j 2 --config $base_path/$train_name/args.yaml --num-classes 7 --results-file $output --checkpoint $checkpoint --amp --use-ema 
 
 # average_augment
 # --aa original

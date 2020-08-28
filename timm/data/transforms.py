@@ -73,7 +73,7 @@ class RandomResizedCropAndInterpolation:
     def __init__(self, size, scale=(0.08, 1.0), ratio=(3. / 4., 4. / 3.),
                  interpolation='bilinear'):
         if isinstance(size, tuple):
-            self.size = size
+            self.size = size # ! don't need exact 224 or 299 output ?
         else:
             self.size = (size, size)
         if (scale[0] > scale[1]) or (ratio[0] > ratio[1]):

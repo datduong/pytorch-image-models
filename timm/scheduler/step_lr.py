@@ -47,7 +47,7 @@ class StepLRScheduler(Scheduler):
         if t < self.warmup_t:
             lrs = [self.warmup_lr_init + t * s for s in self.warmup_steps]
         else:
-            lrs = [v * (self.decay_rate ** (t // self.decay_t)) for v in self.base_values]
+            lrs = [v * (self.decay_rate ** (t // self.decay_t)) for v in self.base_values] # ! decay every lr, current * rate^(t//decay_t)
         return lrs
 
     def get_epoch_values(self, epoch: int):
