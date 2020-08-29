@@ -415,11 +415,19 @@ def main():
 
         # output csv, need to reorder columns
         if not args.aug_eval_data: # otherwise we already convert to 0-1 range ? but now a row will not add to exactly 1 ?
-            prediction = helper.softmax(prediction,theta=1) # ! convert to range 0-1
-            
+            true_label = np.identity(args.num_classes)[true_label]
+            prediction, best_b = helper.find_best_convert ( prediction, true_label )
+            print (best_b)
+            # prediction = helper.convert_max_1_other_0 (prediction)
+            # prediction = helper.convert_score_01_range_horizontal (prediction) 
+            # prediction = 1/(1 + np.exp(-1.0*prediction)) # sigmoid
+            # prediction = helper.softmax(prediction,theta=1) # softmax convert to range 0-1, sum to 1
+
+        print (prediction[1:10,:])
         if args.has_eval_label: 
             # https://scikit-learn.org/stable/modules/generated/sklearn.metrics.accuracy_score.html
-            _logger.info ( 'acc. after softmax {} '.format ( accuracy_score(np.identity(args.num_classes)[true_label],np.round(converted_prediction)) ) ) 
+            from sklearn.metrics import accuracy_score, balanced_accuracy_score
+            _logger.info ( 'acc. after softmax {} '.format ( accuracy_score(true_label,np.round(prediction)) ) ) 
         
         helper.save_output_csv(prediction, [], results_file, average_augment=args.ave_precompute_aug)
 

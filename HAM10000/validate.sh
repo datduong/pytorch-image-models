@@ -39,7 +39,8 @@ checkpoint=$base_path/$train_name/model_best.pth.tar # model_best.pth.tar averag
 
 python3 validate_no_label.py $data_path --model inception_v3 -b $batchsize -j 2 --config $base_path/$train_name/args.yaml --num-classes 7 --results-file $output --checkpoint $checkpoint --amp --use-ema --has_eval_label
 
-# average_augment
+# --has_eval_label
+# --average_augment
 # --aa original
 
 cd $base_path/$train_name

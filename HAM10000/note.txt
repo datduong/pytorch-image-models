@@ -18,6 +18,8 @@ data augmentation transformation is done on the fly.
 
 use no-resume-opt gives bad result 
 
+horizontal conversion, to make value into 0-1 will greatly reduce accuracy at round off 0.5 threshold
+softmax fails, because some row have values below 0.5 so this is no prediction. 
 --
 
 
