@@ -416,6 +416,7 @@ def main():
         # output csv, need to reorder columns
         if not args.aug_eval_data: # otherwise we already convert to 0-1 range ? but now a row will not add to exactly 1 ?
             prediction = helper.softmax(prediction,theta=1) # ! convert to range 0-1
+            
         if args.has_eval_label: 
             # https://scikit-learn.org/stable/modules/generated/sklearn.metrics.accuracy_score.html
             _logger.info ( 'acc. after softmax {} '.format ( accuracy_score(np.identity(args.num_classes)[true_label],np.round(converted_prediction)) ) ) 

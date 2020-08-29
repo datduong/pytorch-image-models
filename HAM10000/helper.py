@@ -56,25 +56,22 @@ def average_over_augmentation (output,default_aug_num=10) :
 
 
 def save_output_csv(prediction, obs_name, output_name, average_augment=False): 
-  prediction = reorder_col(prediction)
-  num_sample = prediction.shape[0]
-  # a_each_row = np.std(prediction,axis=1).reshape ( (num_sample,1)) # reshape to do broadcast
-  # output = convert_score_01_range(prediction,a_each_row)
-  output = convert_score_01_range_horizontal ( prediction )
+  output = reorder_col(prediction) # @prediction should be 0-1 range
+  num_sample = output.shape[0]
+
   if average_augment : # ! take average over all augmentations 
     output = average_over_augmentation (output)
-  #
+  
   fout = open ( output_name , 'w' )
   if len(obs_name) > 0 :
     fout.write('image,MEL,NV,BCC,AKIEC,BKL,DF,VASC\n')
     for index,name in enumerate(obs_name): 
       fout.write(name+','+ ','.join ( str(x) for x in output[index] ) + '\n')
-    # 
   else: 
     fout.write('MEL,NV,BCC,AKIEC,BKL,DF,VASC\n')
     for index in np.arange(output.shape[0]): 
       fout.write(','.join ( str(x) for x in output[index] ) + '\n')
-    # 
+  
   fout.close() 
   
 
