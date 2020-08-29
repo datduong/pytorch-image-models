@@ -75,7 +75,7 @@ def save_output_csv(prediction, obs_name, output_name, average_augment=False):
   fout.close() 
   
 
-def softmax(X, theta = 1.0, axis = 1):
+def softmax(X, theta = 1.0, axis = 1): # https://nolanbconaway.github.io/blog/2017/softmax-numpy.html
     """
     Compute the softmax of each element along an axis of X.
 
