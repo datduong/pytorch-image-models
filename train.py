@@ -543,6 +543,7 @@ def main():
             distributed=args.distributed,
             crop_pct=data_config['crop_pct'],
             pin_memory=args.pin_mem,
+            shuffle=False
         )
 
     # add weighted loss for each label class

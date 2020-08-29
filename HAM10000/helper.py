@@ -13,7 +13,7 @@ def convert_score_01_range (x,a,b=0.5):
   return 1 / (1 + np.exp(-((x - b)/a)))
 
 
-def convert_score_01_range_vertical (x): # ! do not use, looks wrong
+def convert_score_01_range_vertical (x): 
   new_x = np.zeros(x.shape)
   for i in range(x.shape[1]) : # go over col
     a = np.std( x[:,i] )
@@ -22,7 +22,7 @@ def convert_score_01_range_vertical (x): # ! do not use, looks wrong
   return new_x
 
 
-def convert_score_01_range_horizontal (x): 
+def convert_score_01_range_horizontal (x): # ! do not use, looks wrong
   new_x = np.zeros(x.shape)
   for i in range(x.shape[0]) : # go over col
     a = np.std( x[i,:] )
@@ -78,3 +78,45 @@ def save_output_csv(prediction, obs_name, output_name, average_augment=False):
   fout.close() 
   
 
+def softmax(X, theta = 1.0, axis = 1):
+    """
+    Compute the softmax of each element along an axis of X.
+
+    Parameters
+    ----------
+    X: ND-Array. Probably should be floats.
+    theta (optional): float parameter, used as a multiplier
+        prior to exponentiation. Default = 1.0
+    axis (optional): axis to compute values along. Default is the
+        first non-singleton axis.
+
+    Returns an array the same size as X. The result will sum to 1
+    along the specified axis.
+    """
+
+    # make X at least 2d
+    y = np.atleast_2d(X)
+
+    # find axis
+    if axis is None:
+        axis = next(j[0] for j in enumerate(y.shape) if j[1] > 1)
+
+    # multiply y against the theta parameter,
+    y = y * float(theta)
+
+    # subtract the max for numerical stability
+    y = y - np.expand_dims(np.max(y, axis = axis), axis)
+
+    # exponentiate y
+    y = np.exp(y)
+
+    # take the sum along the specified axis
+    ax_sum = np.expand_dims(np.sum(y, axis = axis), axis)
+
+    # finally: divide elementwise
+    p = y / ax_sum
+
+    # flatten if X was 1D
+    if len(X.shape) == 1: p = p.flatten()
+
+    return p

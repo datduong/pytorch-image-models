@@ -232,15 +232,17 @@ def validate(args):
         hflip=args.hflip,
         vflip=args.vflip,
         color_jitter=args.color_jitter,
-        aug_eval_data=args.aug_eval_data) # ! do same data augmentation as train data, so we can eval on many test aug. images
+        aug_eval_data=args.aug_eval_data, # ! do same data augmentation as train data, so we can eval on many test aug. images
+        shuffle=False ) 
 
     batch_time = AverageMeter()
     losses = AverageMeter()
     top1 = AverageMeter()
-    top5 = AverageMeter()
+    topk = AverageMeter()
 
     prediction = None # ! need to save output
-   
+    true_label = None 
+    
     model.eval()
     with torch.no_grad():
         # warmup, reduce variability of first batch time, especially for comparing torchscript vs non
@@ -248,6 +250,11 @@ def validate(args):
         model(input)
         end = time.time()
         for batch_idx, (input, target) in enumerate(loader): # ! not have real label  
+
+            if args.has_eval_label: # ! just save true labels anyway... why not
+                if true_label is None: true_label = target.cpu().data.numpy() 
+                else: true_label = np.concatenate ( ( true_label,target.cpu().data.numpy() ) , axis=0 )
+                
             if args.no_prefetcher:
                 target = target.cuda()
                 input = input.cuda()
@@ -276,10 +283,10 @@ def validate(args):
             if args.has_eval_label: 
                 # measure accuracy and record loss
                 loss = criterion(output, target) # ! don't have gold standard on testset
-                acc1, acc5 = accuracy(output.data, target, topk=(1, 5))
+                acc1, acc5 = accuracy(output.data, target, topk=(1, args.topk))
                 losses.update(loss.item(), input.size(0))
                 top1.update(acc1.item(), input.size(0))
-                top5.update(acc5.item(), input.size(0))
+                topk.update(acc5.item(), input.size(0))
 
             # measure elapsed time
             batch_time.update(time.time() - end)
@@ -291,32 +298,32 @@ def validate(args):
                     'Time: {batch_time.val:.3f}s ({batch_time.avg:.3f}s, {rate_avg:>7.2f}/s)  '
                     'Loss: {loss.val:>7.4f} ({loss.avg:>6.4f})  '
                     'Acc@1: {top1.val:>7.3f} ({top1.avg:>7.3f})  '
-                    'Acc@topk: {top5.val:>7.3f} ({top5.avg:>7.3f})'.format(
+                    'Acc@topk: {topk.val:>7.3f} ({topk.avg:>7.3f})'.format(
                         batch_idx, len(loader), batch_time=batch_time,
                         rate_avg=input.size(0) / batch_time.avg,
-                        loss=losses, top1=top1, top5=top5))
+                        loss=losses, top1=top1, topk=topk))
 
     if not args.has_eval_label: 
-        top1a, top5a = 0, 0 # just dummy, because we don't know ground labels
+        top1a, topka = 0, 0 # just dummy, because we don't know ground labels
     else:
         if real_labels is not None:
             # real labels mode replaces topk values at the end
-            top1a, top5a = real_labels.get_accuracy(k=1), real_labels.get_accuracy(k=args.topk)
+            top1a, topka = real_labels.get_accuracy(k=1), real_labels.get_accuracy(k=args.topk)
         else:
-            top1a, top5a = top1.avg, top5.avg
+            top1a, topka = top1.avg, topk.avg
 
     results = OrderedDict(
         top1=round(top1a, 4), top1_err=round(100 - top1a, 4),
-        top5=round(top5a, 4), top5_err=round(100 - top5a, 4),
+        topk=round(topka, 4), topk_err=round(100 - topka, 4),
         param_count=round(param_count / 1e6, 2),
         img_size=data_config['input_size'][-1],
         cropt_pct=crop_pct,
         interpolation=data_config['interpolation'])
 
-    _logger.info(' * Acc@1 {:.3f} ({:.3f}) Acc@5 {:.3f} ({:.3f})'.format(
-       results['top1'], results['top1_err'], results['top5'], results['top5_err']))
+    _logger.info(' * Acc@1 {:.3f} ({:.3f}) Acc@topk {:.3f} ({:.3f})'.format(
+       results['top1'], results['top1_err'], results['topk'], results['topk_err']))
 
-    return results, prediction
+    return results, prediction, true_label
 
 
 def main():
@@ -368,7 +375,7 @@ def main():
                     try:
                         args.batch_size = batch_size
                         print('Validating with batch size: %d' % args.batch_size)
-                        r, prediction = validate(args)
+                        r, prediction, true_label = validate(args)
                     except RuntimeError as e:
                         if batch_size <= args.num_gpu:
                             print("Validation failed with no ability to reduce batch size. Exiting.")
@@ -387,14 +394,15 @@ def main():
     else:  
           
         from HAM10000 import helper
-        
         if args.ave_precompute_aug: # ! we pre-compute data aug on test set
-            results_file = re.sub (r'\.csv', '', results_file ) + '-ave-aug.csv'
-            r, prediction = validate(args)
+            results_file = re.sub (r'\.csv', '', results_file ) + '-ave-aug-offline.csv'
+            r, prediction, true_label = validate(args)
         elif args.aug_eval_data: # ! do augmentation on-the-fly
+            results_file = re.sub (r'\.csv', '', results_file ) + '-ave-aug-online.csv'
             prediction = None
-            for i in range(args.aug_eval_data_num) : 
-                r, prediction_i = validate(args)
+            for i in range(args.aug_eval_data_num) : # ! slow
+                r, prediction_i, true_label = validate(args)
+                prediction_i = helper.softmax(prediction_i,theta=1) # convert to range 0-1
                 if prediction is None: 
                     prediction = prediction_i
                 else: 
@@ -402,12 +410,17 @@ def main():
             # average
             prediction = prediction / args.aug_eval_data_num
         else: 
-            r, prediction = validate(args)
+            results_file = re.sub (r'\.csv', '', results_file ) + '-standard.csv'
+            r, prediction, true_label = validate(args)
 
+        # output csv, need to reorder columns
+        if not args.aug_eval_data: # otherwise we already convert to 0-1 range ? but now a row will not add to exactly 1 ?
+            prediction = helper.softmax(prediction,theta=1) # ! convert to range 0-1
+        if args.has_eval_label: 
+            # https://scikit-learn.org/stable/modules/generated/sklearn.metrics.accuracy_score.html
+            _logger.info ( 'acc. after softmax {} '.format ( accuracy_score(np.identity(args.num_classes)[true_label],np.round(converted_prediction)) ) ) 
+        
         helper.save_output_csv(prediction, [], results_file, average_augment=args.ave_precompute_aug)
-
-        # ! check validity of conversion to 0-1 range
-
 
 
 def write_results(results_file, results):
