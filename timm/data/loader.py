@@ -155,7 +155,8 @@ def create_loader(
         tf_preprocessing=False,
         use_multi_epochs_loader=False, 
         shuffle=None, 
-        aug_eval_data=False
+        aug_eval_data=False, 
+        weighted_sampler=None
     ):
     
     re_num_splits = 0
@@ -206,7 +207,10 @@ def create_loader(
 
     if shuffle is None: # ! take @shuffle so we can apply same data aug. on test set.
         shuffle = sampler is None and is_training
-    
+
+    if weighted_sampler is not None: # ! can this be distributed ? 
+        sampler = torch.utils.data.sampler.WeightedRandomSampler(weighted_sampler, len(weighted_sampler))
+        
     loader = loader_class(
         dataset,
         batch_size=batch_size,
@@ -215,7 +219,7 @@ def create_loader(
         sampler=sampler,
         collate_fn=collate_fn,
         pin_memory=pin_memory,
-        drop_last=is_training,
+        drop_last=is_training
     )
     if use_prefetcher:
         prefetch_re_prob = re_prob if is_training and not no_aug else 0.

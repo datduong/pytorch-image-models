@@ -4,7 +4,7 @@ from datetime import datetime
 
 base = """#!/bin/bash
 
-data_path=/data/duongdb/HAM10000dataset/ImagesLabelFolderOriginalFormatTrainDevRandomState1/
+data_path=/data/duongdb/HAM10000dataset/ImagesLabelFolderOriginalFormatTrainDevRandomState10/
 output=/data/duongdb/HAM10000dataset/MODEL-NAME/
 batchsize=64
 cd /data/duongdb/pytorch-image-models
@@ -13,6 +13,7 @@ python3 train.py $data_path --model MODEL-NAME -b $batchsize --sched step --epoc
 
 """
 
+# --img-size 450
 # --decay-epochs 2.4
 # where_resume=/data/duongdb/HAM10000dataset/inception_v3/train/20200826-200800-inception_v3-299/
 # --resume /data/duongdb/HAM10000dataset/efficientnet_b0/train/20200825-193738-efficientnet_b0-224/averaged.pth
@@ -24,7 +25,7 @@ python3 train.py $data_path --model MODEL-NAME -b $batchsize --sched step --epoc
 os.chdir('/data/duongdb/pytorch-image-models/HAM10000')
 
 
-script_base_array = [ 'efficientnet_b0', 'efficientnet_b1', 'efficientnet_b2' ] #  'efficientnet_b0' , 'efficientnet_b1', 'efficientnet_b2' 'inception_v3' nadam
+script_base_array = [ 'efficientnet_b0' ] #  'efficientnet_b0' , 'efficientnet_b1', 'efficientnet_b2' 'inception_v3' nadam
 LR = [0.001]
 
 for script_base in script_base_array: 

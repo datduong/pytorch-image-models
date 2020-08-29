@@ -41,7 +41,6 @@ def convert_max_1_other_0 (a):
   return b
 
 
-
 def find_best_convert (x,true_label): 
   best_b = 0
   new_x = np.zeros(x.shape)
@@ -99,7 +98,7 @@ def save_output_csv(prediction, obs_name, output_name, average_augment=False):
   output = reorder_col(prediction) # @prediction should be 0-1 range
   num_sample = output.shape[0]
 
-  if average_augment : # ! take average over all augmentations 
+  if average_augment : # ! take average over all augmentations in off-line mode 
     output = average_over_augmentation (output)
   
   fout = open ( output_name , 'w' )
