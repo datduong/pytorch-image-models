@@ -254,8 +254,8 @@ def create_transform(
         re_num_splits=0,
         crop_pct=None,
         tf_preprocessing=False,
-        separate=False, 
-        aug_eval_data=False):
+        separate=False
+    ):
 
     if isinstance(input_size, tuple):
         img_size = input_size[-2:]
@@ -296,22 +296,7 @@ def create_transform(
                 separate=separate)
         else:
             assert not separate, "Separate transforms not supported for validation preprocessing"
-            if aug_eval_data : # ! data aug on eval data
-                transform = transforms_imagenet_eval_aug( 
-                    img_size,
-                    interpolation=interpolation,
-                    use_prefetcher=use_prefetcher,
-                    mean=mean,
-                    std=std,
-                    crop_pct=crop_pct,
-                    auto_augment=auto_augment, 
-                    scale=scale,
-                    ratio=ratio,
-                    hflip=hflip,
-                    vflip=vflip,
-                    color_jitter=color_jitter)
-            else: 
-                transform = transforms_imagenet_eval(
+            transform = transforms_imagenet_eval(
                     img_size,
                     interpolation=interpolation,
                     use_prefetcher=use_prefetcher,

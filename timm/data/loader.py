@@ -154,8 +154,7 @@ def create_loader(
         fp16=False,
         tf_preprocessing=False,
         use_multi_epochs_loader=False, 
-        shuffle=None, 
-        aug_eval_data=False
+        shuffle=None
     ):
     
     re_num_splits = 0
@@ -183,11 +182,11 @@ def create_loader(
         re_mode=re_mode,
         re_count=re_count,
         re_num_splits=re_num_splits,
-        separate=num_aug_splits > 0,
-        aug_eval_data=aug_eval_data
+        separate=num_aug_splits > 0
     )
 
     sampler = None
+    # ! it seems @weighted_sampler is weight of each observation. https://discuss.pytorch.org/t/balanced-sampling-between-classes-with-torchvision-dataloader/2703/10
     if distributed:
         if is_training:
             sampler = torch.utils.data.distributed.DistributedSampler(dataset)
@@ -206,12 +205,7 @@ def create_loader(
 
     if shuffle is None: # ! take @shuffle so we can apply same data aug. on test set.
         shuffle = sampler is None and is_training
-
-    # if weighted_sampler is not None: # ! can this be distributed ? 
-    #     # ! it seems @weighted_sampler is weight of each observation. https://discuss.pytorch.org/t/balanced-sampling-between-classes-with-torchvision-dataloader/2703/10
-    #     temp = [float(w) for w in weighted_sampler.strip().split()] # string
-    #     sampler = torch.utils.data.sampler.WeightedRandomSampler(temp, batch_size)
-        
+ 
     loader = loader_class(
         dataset,
         batch_size=batch_size,

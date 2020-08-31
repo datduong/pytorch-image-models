@@ -241,8 +241,6 @@ parser.add_argument("--weighted_cross_entropy", default=None, type=str,
                     help='weight each label class')
 parser.add_argument("--weighted_cross_entropy_eval", action='store_true', default=False,
                     help='add more layers to classification layer')
-parser.add_argument("--aug_eval_data", action='store_true', default=False,
-                    help='on-the-fly aug of eval data')
 parser.add_argument("--classification_layer_name", default=None, type=str,
                     help='if not None, we set base params with lower learning rate')
 parser.add_argument("--filter_bias_and_bn", action='store_true', default=False,
@@ -499,52 +497,21 @@ def main():
             _logger.error('Validation folder does not exist at: {}'.format(eval_dir))
             exit(1)
     dataset_eval = Dataset(eval_dir)
-
-    if args.aug_eval_data : # ! do same data augmentation as train data, so we can eval on many test aug. images
-        loader_eval = create_loader(
-            dataset_eval,
-            input_size=data_config['input_size'],
-            batch_size=args.batch_size,
-            is_training=True, # ! set true, so we do same type of aug on eval set
-            use_prefetcher=args.prefetcher,
-            no_aug=args.no_aug,
-            re_prob=args.reprob,
-            re_mode=args.remode,
-            re_count=args.recount,
-            re_split=args.resplit,
-            scale=args.scale,
-            ratio=args.ratio,
-            hflip=args.hflip,
-            vflip=args.vflip,
-            color_jitter=args.color_jitter,
-            auto_augment=args.aa, # ! see file auto_augment.py
-            num_aug_splits=num_aug_splits,
-            interpolation=train_interpolation,
-            mean=data_config['mean'],
-            std=data_config['std'],
-            num_workers=args.workers,
-            distributed=args.distributed,
-            collate_fn=collate_fn,
-            pin_memory=args.pin_mem,
-            use_multi_epochs_loader=args.use_multi_epochs_loader,
-            shuffle=False # ! no shuffle for eval set ... well doesn't matter really duing training
-        )
-    else: 
-        loader_eval = create_loader(
-            dataset_eval,
-            input_size=data_config['input_size'],
-            batch_size=args.validation_batch_size_multiplier * args.batch_size, # ! so we can eval faster
-            is_training=False,
-            use_prefetcher=args.prefetcher,
-            interpolation=data_config['interpolation'],
-            mean=data_config['mean'],
-            std=data_config['std'],
-            num_workers=args.workers,
-            distributed=args.distributed,
-            crop_pct=data_config['crop_pct'],
-            pin_memory=args.pin_mem,
-            shuffle=False
-        )
+    loader_eval = create_loader(
+        dataset_eval,
+        input_size=data_config['input_size'],
+        batch_size=args.validation_batch_size_multiplier * args.batch_size, # ! so we can eval faster
+        is_training=False,
+        use_prefetcher=args.prefetcher,
+        interpolation=data_config['interpolation'],
+        mean=data_config['mean'],
+        std=data_config['std'],
+        num_workers=args.workers,
+        distributed=args.distributed,
+        crop_pct=data_config['crop_pct'],
+        pin_memory=args.pin_mem,
+        shuffle=False
+    )
 
     # add weighted loss for each label class
     if args.weighted_cross_entropy is None: 
