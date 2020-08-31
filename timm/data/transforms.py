@@ -102,7 +102,7 @@ class RandomResizedCropAndInterpolation:
         area = img.size[0] * img.size[1]
 
         for attempt in range(10):
-            target_area = random.uniform(*scale) * area
+            target_area = random.uniform(*scale) * area # area to crop
             log_ratio = (math.log(ratio[0]), math.log(ratio[1]))
             aspect_ratio = math.exp(random.uniform(*log_ratio))
 
@@ -142,7 +142,7 @@ class RandomResizedCropAndInterpolation:
             interpolation = random.choice(self.interpolation)
         else:
             interpolation = self.interpolation
-        return F.resized_crop(img, i, j, h, w, self.size, interpolation)
+        return F.resized_crop(img, i, j, h, w, self.size, interpolation) # https://pytorch.org/docs/stable/torchvision/transforms.html#torchvision.transforms.functional.resized_crop
 
     def __repr__(self):
         if isinstance(self.interpolation, (tuple, list)):

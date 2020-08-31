@@ -254,7 +254,7 @@ parser.add_argument('--last_layer_weight_decay', type=float, default=0.0001,
 parser.add_argument('--early_stop_counter', type=int, default=50,
                     help='after we see best epoch, how many later epochs to wait before exit') 
 parser.add_argument('--topk', type=int, default=2,
-                    help='highest topk') 
+                    help='highest topk')
 
 
 

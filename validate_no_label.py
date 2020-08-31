@@ -108,6 +108,8 @@ parser.add_argument('--ave_precompute_aug', action='store_true', default=False,
                     help='average augmentation of each test sample')
 parser.add_argument("--aug_eval_data_num", type=int, default=50, # ! aug_eval_data should be "on" in training
                     help='how many data aug, and average them')
+parser.add_argument("--aug_eval_data", action='store_true', default=False,
+                    help='on-the-fly aug of eval data')
 parser.add_argument('--seed', type=int, default=1, metavar='S',
                     help='random seed')
 

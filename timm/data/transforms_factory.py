@@ -134,7 +134,8 @@ def transforms_imagenet_eval(
         use_prefetcher=False,
         mean=IMAGENET_DEFAULT_MEAN,
         std=IMAGENET_DEFAULT_STD):
-    crop_pct = crop_pct or DEFAULT_CROP_PCT
+    
+    crop_pct = crop_pct or DEFAULT_CROP_PCT # enlarge image, and then crop it in middle
 
     if isinstance(img_size, tuple):
         assert len(img_size) == 2
