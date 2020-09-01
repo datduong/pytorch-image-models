@@ -25,7 +25,7 @@ python3 train.py $data_path --model MODEL-NAME -b $batchsize --sched step --epoc
 os.chdir('/data/duongdb/pytorch-image-models/HAM10000')
 
 
-script_base_array = [ 'efficientnet_b0' ] #  'efficientnet_b0' , 'efficientnet_b1', 'efficientnet_b2' 'inception_v3' nadam
+script_base_array = [ 'efficientnet_b2' ] #  'efficientnet_b0' , 'efficientnet_b1', 'efficientnet_b2' 'inception_v3' nadam
 LR = [0.001]
 
 for script_base in script_base_array: 

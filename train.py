@@ -255,7 +255,6 @@ parser.add_argument('--topk', type=int, default=2,
                     help='highest topk')
 
 
-
 def _parse_args():
     # Do we have a config file to parse?
     args_config, remaining = config_parser.parse_known_args()
