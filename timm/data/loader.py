@@ -14,6 +14,7 @@ from .constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 from .distributed_sampler import OrderedDistributedSampler
 from .random_erasing import RandomErasing
 from .mixup import FastCollateMixup
+from .ISIC2020_data_aug import ISIC2020_get_transforms
 
 
 def fast_collate(batch):
@@ -129,6 +130,7 @@ def create_loader(
         dataset,
         input_size,
         batch_size,
+        args, # ! in case we need to change this code
         is_training=False,
         use_prefetcher=True,
         no_aug=False,
@@ -153,38 +155,42 @@ def create_loader(
         pin_memory=False,
         fp16=False,
         tf_preprocessing=False,
-        use_multi_epochs_loader=False, 
-        args=args # ! in case we need to change this code
+        use_multi_epochs_loader=False
     ):
     
     re_num_splits = 0
     if re_split:
         # apply RE to second half of batch if no aug split otherwise line up with aug split
         re_num_splits = num_aug_splits or 2
-    
-    dataset.transform = create_transform(
-        input_size,
-        is_training=is_training,
-        use_prefetcher=use_prefetcher,
-        no_aug=no_aug,
-        scale=scale,
-        ratio=ratio,
-        hflip=hflip,
-        vflip=vflip,
-        color_jitter=color_jitter,
-        auto_augment=auto_augment,
-        interpolation=interpolation,
-        mean=mean,
-        std=std,
-        crop_pct=crop_pct,
-        tf_preprocessing=tf_preprocessing,
-        re_prob=re_prob,
-        re_mode=re_mode,
-        re_count=re_count,
-        re_num_splits=re_num_splits,
-        separate=num_aug_splits > 0, 
-        args=args
-    )
+
+    if args.aa == 'ISIC2020': # augmentation policy
+        # @image_size is channel x size x size by default, we only need one size
+        dataset.transform = ISIC2020_get_transforms(args.img_size , is_training)
+    else: 
+        dataset.transform = create_transform(
+            input_size,
+            is_training=is_training,
+            use_prefetcher=use_prefetcher,
+            no_aug=no_aug,
+            scale=scale,
+            ratio=ratio,
+            hflip=hflip,
+            vflip=vflip,
+            color_jitter=color_jitter,
+            auto_augment=auto_augment,
+            interpolation=interpolation,
+            mean=mean,
+            std=std,
+            crop_pct=crop_pct,
+            tf_preprocessing=tf_preprocessing,
+            re_prob=re_prob,
+            re_mode=re_mode,
+            re_count=re_count,
+            re_num_splits=re_num_splits,
+            separate=num_aug_splits > 0
+        )
+
+    print('dataset data augmentation {}'.format(dataset.transform)) # ! just to doublecheck
 
     if args.sampler is None :
         if distributed:
@@ -206,11 +212,11 @@ def create_loader(
     if use_multi_epochs_loader:
         loader_class = MultiEpochsDataLoader
 
-    if args.not_shuffle is None: # ! so we can apply data aug. on test set.
-        shuffle = sampler is None and is_training
+    if args.not_shuffle:
+        shuffle = not args.not_shuffle # if not_shuffle=True, we turn shuffle=False, # ! so we can apply data aug. on test set.
     else: 
-        shuffle = not args.not_shuffle
- 
+        shuffle = sampler is None and is_training
+    
     loader = loader_class(
         dataset,
         batch_size=batch_size,

@@ -236,7 +236,7 @@ parser.add_argument("--local_rank", default=0, type=int)
 parser.add_argument('--use-multi-epochs-loader', action='store_true', default=False,
                     help='use the multi-epochs-loader to save time at the beginning of every epoch')
 
-# my own params
+# ! my own params
 parser.add_argument("--weighted_cross_entropy", default=None, type=str,
                     help='weight each label class')
 parser.add_argument("--weighted_cross_entropy_eval", action='store_true', default=False,
@@ -249,12 +249,16 @@ parser.add_argument("--create_classifier_layerfc", action='store_true', default=
                     help='add more layers to classification layer')
 parser.add_argument('--last_layer_weight_decay', type=float, default=0.0001,
                     help='weight decay in the last layer (default: 0.0001)') 
-parser.add_argument('--early_stop_counter', type=int, default=50,
+parser.add_argument('--early_stop_counter', type=int, default=20,
                     help='after we see best epoch, how many later epochs to wait before exit') 
 parser.add_argument('--topk', type=int, default=2,
                     help='highest topk')
 parser.add_argument('--lr_base_params', type=float, default=None, metavar='LR',
                     help='learning rate of base model, transfer learning')
+parser.add_argument("--sampler", default=None, type=str,
+                    help='name of a sampler, eg. ImbalancedDatasetSampler')
+parser.add_argument("--not_shuffle", action='store_true', default=False,
+                    help='not shuffle dataset')
 
 def _parse_args():
     # Do we have a config file to parse?
@@ -487,7 +491,8 @@ def main():
         distributed=args.distributed,
         collate_fn=collate_fn,
         pin_memory=args.pin_mem,
-        use_multi_epochs_loader=args.use_multi_epochs_loader
+        use_multi_epochs_loader=args.use_multi_epochs_loader,
+        args=args
     )
 
     eval_dir = os.path.join(args.data, 'val')

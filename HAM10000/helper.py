@@ -1,11 +1,8 @@
-
-
 import os,sys,re,pickle
 import numpy as np 
 import pandas as pd 
 from copy import deepcopy
 
-from sklearn.metrics import accuracy_score
 
 def convert_score_01_range (x,a,b=0.5): 
   # Diagnosis confidences are expressed as floating-point values in the closed interval [0.0, 1.0], where 0.5 is used as the binary classification threshold. Note that arbitrary score ranges and thresholds can be converted to the range of 0.0 to 1.0, with a threshold of 0.5, trivially using the following sigmoid conversion:
@@ -15,59 +12,10 @@ def convert_score_01_range (x,a,b=0.5):
   return 1 / (1 + np.exp(-((x - b)/a)))
 
 
-def convert_score_01_range_vertical (x): 
-  new_x = np.zeros(x.shape)
-  for i in range(x.shape[1]) : # go over col
-    a = np.std( x[:,i] )
-    new = 1 / (1 + np.exp(-((x[:,i] - .5)/a)))
-    new_x[:,i] = new
-  return new_x
-
-
-def convert_score_01_range_horizontal (x): # ! do not use, looks wrong
-  new_x = np.zeros(x.shape)
-  for i in range(x.shape[0]) : # go over col
-    a = np.std( x[i,:] )
-    new = 1 / (1 + np.exp(-((x[i,:] - .5)/a)))
-    new_x[i,:] = new
-  return new_x
-
-
 def convert_max_1_other_0 (a): 
   b = np.zeros_like(a)
   b[np.arange(len(a)), a.argmax(1)] = 1
-  # b = b + .0001
-  # b[b > 1] = .9999 # site won't take integer ? 
   return b
-
-
-def find_best_convert (x,true_label): 
-  best_b = 0
-  new_x = np.zeros(x.shape)
-  best_score = 0
-  a = np.std(np.squeeze(np.asarray(x)))
-  for b in np.arange(-10,10,.1): 
-    new = 1 / (1 + np.exp(-((x - b)/a)))
-    current_score = accuracy_score(true_label, np.round(new))
-    if current_score > best_score: 
-      new_x = deepcopy(new)
-      best_b = b
-  return new_x, best_b
-
-
-def find_best_convert_each_i (x,true_label): 
-  best_b = np.zeros(x.shape[1])
-  new_x = np.zeros(x.shape)
-  for i in range(x.shape[1]) : # go over each col
-    a = np.std( x[:,i] ) ## go down col, take std
-    best_score = 0
-    for b in np.arange(-1,1,.1): 
-      new = 1 / (1 + np.exp(-((x[:,i] - b)/a)))
-      current_score = accuracy_score(true_label[:,i], np.round(new))
-      if current_score > best_score: 
-        new_x[:,i] = new
-        best_b[i] = b
-  return new_x, best_b
 
   
 def reorder_col (inputs,pytorch_label=['akiec', 'bcc', 'bkl', 'df', 'mel', 'nv', 'vasc']): 
@@ -161,3 +109,5 @@ def softmax(X, theta = 1.0, axis = 1): # https://nolanbconaway.github.io/blog/20
     if len(X.shape) == 1: p = p.flatten()
 
     return p
+
+  

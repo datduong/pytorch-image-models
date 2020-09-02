@@ -184,8 +184,7 @@ def create_transform(
         re_num_splits=0,
         crop_pct=None,
         tf_preprocessing=False,
-        separate=False, 
-        args=args
+        separate=False
     ):
 
     if isinstance(input_size, tuple):
@@ -235,6 +234,4 @@ def create_transform(
                     std=std,
                     crop_pct=crop_pct)
 
-    print ('transform used')
-    print (transform)
     return transform

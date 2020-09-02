@@ -105,7 +105,9 @@ parser.add_argument('--valid-labels', default='', type=str, metavar='FILENAME',
 parser.add_argument("--has_eval_label", action='store_true', default=False,
                     help='on-the-fly aug of eval data')
 parser.add_argument('--seed', type=int, default=1, metavar='S',
-                    help='random seed')
+                    help='random seed') # in case we apply data augmentation on test set
+parser.add_argument("--not_shuffle", action='store_true', default=False,
+                    help='not shuffle dataset')
 
 
 def set_jit_legacy():
@@ -119,7 +121,6 @@ def set_jit_legacy():
     torch._C._jit_set_profiling_mode(False)
     torch._C._jit_override_can_fuse_on_gpu(True)
     #torch._C._jit_set_texpr_fuser_enabled(True)
-
 
 
 def _parse_args():
@@ -228,7 +229,8 @@ def validate(args):
         hflip=args.hflip,
         vflip=args.vflip,
         color_jitter=args.color_jitter,
-        shuffle=False ) 
+        args=args 
+        ) 
 
     batch_time = AverageMeter()
     losses = AverageMeter()
