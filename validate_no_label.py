@@ -333,7 +333,7 @@ def main():
     
     model_cfgs = []
     model_names = []
-    if os.path.isdir(args.checkpoint):
+    if os.path.isdir(args.checkpoint): # ! can pass in a directory of checkpoints
         # validate all checkpoints in a path with same model
         checkpoints = glob.glob(args.checkpoint + '/*.pth.tar')
         checkpoints += glob.glob(args.checkpoint + '/*.pth')
@@ -384,22 +384,22 @@ def main():
         if len(results):
             write_results(results_file, results)
     else:  
-          
-        from HAM10000 import helper
-        
+        # ! eval one single model  
         results_file = re.sub (r'\.csv', '', results_file ) + '-standard.csv'
-        r, prediction, true_label = validate(args)
-        
-        prediction = helper.softmax(prediction,theta=1) # softmax convert to range 0-1, sum to 1
+        _, prediction, true_label = validate(args)
+
+        from HAM10000 import helper
+        prediction = helper.softmax(prediction) # softmax convert to range 0-1, sum to 1
 
         if args.has_eval_label: 
             from sklearn.metrics import accuracy_score, balanced_accuracy_score
-            true_label = np.identity(args.num_classes)[true_label] # array into 1 hot
+            true_label_onehot = np.identity(args.num_classes)[true_label] # array into 1 hot
             # https://scikit-learn.org/stable/modules/generated/sklearn.metrics.accuracy_score.html
-            _logger.info ( 'sklearn accuracy_score {} '.format ( accuracy_score(true_label, np.round(prediction)) ) ) 
+            _logger.info ( ' * sklearn multilabel probabilities accuracy_score {:.3f} '.format ( accuracy_score(true_label_onehot, np.round(prediction)) ) ) 
+            _logger.info ( ' * sklearn max probabilities balanced_accuracy_score {:.3f} '.format ( balanced_accuracy_score(true_label, helper.convert_max_1_other_0(prediction).argmax(axis=1) ) ) ) 
 
         # output csv, need to reorder columns
-        helper.save_output_csv(prediction, [], results_file, average_augment=args.ave_precompute_aug)
+        helper.save_output_csv(prediction, obs_name=[], output_name=results_file) # no name for each observation, use []
 
 
 def write_results(results_file, results):

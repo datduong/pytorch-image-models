@@ -154,7 +154,7 @@ def create_loader(
         fp16=False,
         tf_preprocessing=False,
         use_multi_epochs_loader=False, 
-        shuffle=None
+        args=args # ! in case we need to change this code
     ):
     
     re_num_splits = 0
@@ -182,18 +182,21 @@ def create_loader(
         re_mode=re_mode,
         re_count=re_count,
         re_num_splits=re_num_splits,
-        separate=num_aug_splits > 0
+        separate=num_aug_splits > 0, 
+        args=args
     )
 
-    sampler = None
-    # ! it seems @weighted_sampler is weight of each observation. https://discuss.pytorch.org/t/balanced-sampling-between-classes-with-torchvision-dataloader/2703/10
-    if distributed:
-        if is_training:
-            sampler = torch.utils.data.distributed.DistributedSampler(dataset)
-        else:
-            # This will add extra duplicate entries to result in equal num
-            # of samples per-process, will slightly alter validation results
-            sampler = OrderedDistributedSampler(dataset)
+    if args.sampler is None :
+        if distributed:
+            if is_training:
+                sampler = torch.utils.data.distributed.DistributedSampler(dataset)
+            else:
+                # This will add extra duplicate entries to result in equal num
+                # of samples per-process, will slightly alter validation results
+                sampler = OrderedDistributedSampler(dataset)
+    elif args.sampler == 'ImbalancedDatasetSampler': 
+        from torchsampler import ImbalancedDatasetSampler # https://github.com/ufoym/imbalanced-dataset-sampler
+        sampler=ImbalancedDatasetSampler(dataset)
 
     if collate_fn is None:
         collate_fn = fast_collate if use_prefetcher else torch.utils.data.dataloader.default_collate
@@ -203,8 +206,10 @@ def create_loader(
     if use_multi_epochs_loader:
         loader_class = MultiEpochsDataLoader
 
-    if shuffle is None: # ! take @shuffle so we can apply same data aug. on test set.
+    if args.not_shuffle is None: # ! so we can apply data aug. on test set.
         shuffle = sampler is None and is_training
+    else: 
+        shuffle = not args.not_shuffle
  
     loader = loader_class(
         dataset,

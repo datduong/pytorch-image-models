@@ -36,8 +36,8 @@ def convert_score_01_range_horizontal (x): # ! do not use, looks wrong
 def convert_max_1_other_0 (a): 
   b = np.zeros_like(a)
   b[np.arange(len(a)), a.argmax(1)] = 1
-  b = b + .0001
-  b[b > 1] = .9999 # site won't take integer ? 
+  # b = b + .0001
+  # b[b > 1] = .9999 # site won't take integer ? 
   return b
 
 
@@ -113,6 +113,11 @@ def save_output_csv(prediction, obs_name, output_name, average_augment=False):
   
   fout.close() 
   
+
+def sigmoid(x,shift=0):
+  x = x + shift
+  return 1/(1 + np.exp(-x)) 
+
 
 def softmax(X, theta = 1.0, axis = 1): # https://nolanbconaway.github.io/blog/2017/softmax-numpy.html
     """
