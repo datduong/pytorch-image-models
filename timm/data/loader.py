@@ -6,6 +6,8 @@ https://github.com/NVIDIA/apex/commit/d5e2bb4bdeedd27b1dfaf5bb2b24d6c000dee9be#d
 Hacked together by / Copyright 2020 Ross Wightman
 """
 
+import torchvision.datasets as dset
+
 import torch.utils.data
 import numpy as np
 
@@ -14,6 +16,7 @@ from .constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 from .distributed_sampler import OrderedDistributedSampler
 from .random_erasing import RandomErasing
 from .mixup import FastCollateMixup
+from .imbalanced import ImbalancedDatasetSampler
 from .ISIC2020_data_aug import ISIC2020_get_transforms
 
 
@@ -164,8 +167,8 @@ def create_loader(
         re_num_splits = num_aug_splits or 2
 
     if args.aa == 'ISIC2020': # augmentation policy
-        # @image_size is channel x size x size by default, we only need one size
-        dataset.transform = ISIC2020_get_transforms(args.img_size , is_training)
+        # @image_size is channel x width x height by default, we only need one size
+        dataset.transform = ISIC2020_get_transforms(input_size[1], is_training)
     else: 
         dataset.transform = create_transform(
             input_size,
@@ -192,6 +195,8 @@ def create_loader(
 
     print('dataset data augmentation {}'.format(dataset.transform)) # ! just to doublecheck
 
+    sampler = None
+    shuffle = is_training
     if args.sampler is None :
         if distributed:
             if is_training:
@@ -200,9 +205,15 @@ def create_loader(
                 # This will add extra duplicate entries to result in equal num
                 # of samples per-process, will slightly alter validation results
                 sampler = OrderedDistributedSampler(dataset)
+            #
+        # ! when use distributed sampler cannot be "none"
+        shuffle = sampler is None and is_training
     elif args.sampler == 'ImbalancedDatasetSampler': 
-        from torchsampler import ImbalancedDatasetSampler # https://github.com/ufoym/imbalanced-dataset-sampler
-        sampler=ImbalancedDatasetSampler(dataset)
+        if is_training :
+            # https://github.com/ufoym/imbalanced-dataset-sampler
+            sampler = ImbalancedDatasetSampler(dataset) # ValueError: sampler option is mutually exclusive with shuffle
+            shuffle = False
+          
 
     if collate_fn is None:
         collate_fn = fast_collate if use_prefetcher else torch.utils.data.dataloader.default_collate
@@ -212,11 +223,6 @@ def create_loader(
     if use_multi_epochs_loader:
         loader_class = MultiEpochsDataLoader
 
-    if args.not_shuffle:
-        shuffle = not args.not_shuffle # if not_shuffle=True, we turn shuffle=False, # ! so we can apply data aug. on test set.
-    else: 
-        shuffle = sampler is None and is_training
-    
     loader = loader_class(
         dataset,
         batch_size=batch_size,

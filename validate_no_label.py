@@ -106,8 +106,6 @@ parser.add_argument("--has_eval_label", action='store_true', default=False,
                     help='on-the-fly aug of eval data')
 parser.add_argument('--seed', type=int, default=1, metavar='S',
                     help='random seed') # in case we apply data augmentation on test set
-parser.add_argument("--not_shuffle", action='store_true', default=False,
-                    help='not shuffle dataset')
 
 
 def set_jit_legacy():

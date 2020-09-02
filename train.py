@@ -257,8 +257,6 @@ parser.add_argument('--lr_base_params', type=float, default=None, metavar='LR',
                     help='learning rate of base model, transfer learning')
 parser.add_argument("--sampler", default=None, type=str,
                     help='name of a sampler, eg. ImbalancedDatasetSampler')
-parser.add_argument("--not_shuffle", action='store_true', default=False,
-                    help='not shuffle dataset')
 
 def _parse_args():
     # Do we have a config file to parse?
@@ -515,7 +513,7 @@ def main():
         distributed=args.distributed,
         crop_pct=data_config['crop_pct'],
         pin_memory=args.pin_mem,
-        shuffle=False
+        args=args
     )
 
     # add weighted loss for each label class
