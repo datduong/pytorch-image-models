@@ -253,7 +253,8 @@ parser.add_argument('--early_stop_counter', type=int, default=50,
                     help='after we see best epoch, how many later epochs to wait before exit') 
 parser.add_argument('--topk', type=int, default=2,
                     help='highest topk')
-
+parser.add_argument('--lr_base_params', type=float, default=None, metavar='LR',
+                    help='learning rate of base model, transfer learning')
 
 def _parse_args():
     # Do we have a config file to parse?

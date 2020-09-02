@@ -52,9 +52,12 @@ def set_lr_per_params(args, model, last_layer_list, weight_decay=1e-5, skip_list
                     base_params_decay.append(param)
     # 
     print ('last_layer_param_name {}'.format(last_layer_param_name))
+    if args.lr_base_params is None: 
+        args.lr_base_params = args.lr/10.0
+    
     return [    {'params': last_layer_params, 'weight_decay': args.last_layer_weight_decay }, 
-                {'params': base_params_no_decay, 'weight_decay': 0., 'lr': args.lr/10.0 }, # lower base param lr by 10x based on their paper
-                {'params': base_params_decay, 'weight_decay': weight_decay, 'lr': args.lr/10.0 } ]
+                {'params': base_params_no_decay, 'weight_decay': 0., 'lr': args.lr_base_params }, # lower base param lr by 10x based on their paper
+                {'params': base_params_decay, 'weight_decay': weight_decay, 'lr': args.lr_base_params } ]
      
 
 def create_optimizer(args, model, filter_bias_and_bn=True, classification_layer_name=None):
