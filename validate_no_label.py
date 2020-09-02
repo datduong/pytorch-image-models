@@ -104,12 +104,6 @@ parser.add_argument('--valid-labels', default='', type=str, metavar='FILENAME',
 # ! my own args
 parser.add_argument("--has_eval_label", action='store_true', default=False,
                     help='on-the-fly aug of eval data')
-parser.add_argument('--ave_precompute_aug', action='store_true', default=False,
-                    help='average augmentation of each test sample')
-parser.add_argument("--aug_eval_data_num", type=int, default=50, # ! aug_eval_data should be "on" in training
-                    help='how many data aug, and average them')
-parser.add_argument("--aug_eval_data", action='store_true', default=False,
-                    help='on-the-fly aug of eval data')
 parser.add_argument('--seed', type=int, default=1, metavar='S',
                     help='random seed')
 
@@ -234,7 +228,6 @@ def validate(args):
         hflip=args.hflip,
         vflip=args.vflip,
         color_jitter=args.color_jitter,
-        aug_eval_data=args.aug_eval_data, # ! do same data augmentation as train data, so we can eval on many test aug. images
         shuffle=False ) 
 
     batch_time = AverageMeter()
@@ -334,9 +327,6 @@ def main():
     args, args_text = _parse_args()
     # args = parser.parse_args()
 
-    if args.ave_precompute_aug and args.aug_eval_data: 
-        sys.exit ('check args.ave_precompute_aug and args.aug_eval_data, only 1 can be true ')
-
     torch.manual_seed(args.seed) # ! mostly for aug on test
     random.seed(args.seed)
     np.random.seed(args.seed)
@@ -397,28 +387,10 @@ def main():
           
         from HAM10000 import helper
         
-        if args.ave_precompute_aug: # ! we pre-compute data aug on test set
-            results_file = re.sub (r'\.csv', '', results_file ) + '-ave-aug-offline.csv'
-            r, prediction, true_label = validate(args)
-        elif args.aug_eval_data: # ! do augmentation on-the-fly
-            results_file = re.sub (r'\.csv', '', results_file ) + '-ave-aug-online.csv'
-            prediction = None
-            for i in range(args.aug_eval_data_num) : # ! slow
-                r, prediction_i, true_label = validate(args)
-                prediction_i = helper.softmax(prediction_i,theta=1) # convert to range 0-1
-                if prediction is None: 
-                    prediction = prediction_i
-                else: 
-                    prediction = prediction + prediction_i
-            # average
-            prediction = prediction / args.aug_eval_data_num
-        else: 
-            results_file = re.sub (r'\.csv', '', results_file ) + '-standard.csv'
-            r, prediction, true_label = validate(args)
-
+        results_file = re.sub (r'\.csv', '', results_file ) + '-standard.csv'
+        r, prediction, true_label = validate(args)
         
-        if not args.aug_eval_data: # otherwise we already convert to 0-1 range ? but now a row will not add to exactly 1 ?
-            prediction = helper.softmax(prediction,theta=1) # softmax convert to range 0-1, sum to 1
+        prediction = helper.softmax(prediction,theta=1) # softmax convert to range 0-1, sum to 1
 
         if args.has_eval_label: 
             from sklearn.metrics import accuracy_score, balanced_accuracy_score
