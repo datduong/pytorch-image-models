@@ -213,8 +213,9 @@ def create_loader(
             # https://github.com/ufoym/imbalanced-dataset-sampler
             sampler = ImbalancedDatasetSampler(dataset) # ValueError: sampler option is mutually exclusive with shuffle
             shuffle = False
+            
+    print ('dataset sampler {}'.format(sampler))
           
-
     if collate_fn is None:
         collate_fn = fast_collate if use_prefetcher else torch.utils.data.dataloader.default_collate
 

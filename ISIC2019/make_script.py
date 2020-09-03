@@ -4,7 +4,10 @@ from datetime import datetime
 
 base = """#!/bin/bash
 
-module load python/3.7
+source /data/$USER/conda/etc/profile.d/conda.sh
+conda activate base
+
+# module load python/3.7
 
 data_path=/data/duongdb/ISIC2019-SkinCancer8Labels/TrainDevTestRandState1/
 output=/data/duongdb/ISIC2019-SkinCancer8Labels/TrainDevTestRandState1/MODEL-NAME/
@@ -12,10 +15,12 @@ output=/data/duongdb/ISIC2019-SkinCancer8Labels/TrainDevTestRandState1/MODEL-NAM
 batchsize=64
 cd /data/duongdb/pytorch-image-models
 
-python3 train.py $data_path --model MODEL-NAME -b $batchsize --sched step --epochs 450 --decay-epochs 2.4 --decay-rate .97 --opt rmsproptf --opt-eps .001 -j 8 --warmup-lr 1e-6 --weight-decay 0 --last_layer_weight_decay 0.0001 --drop DROPOUT --drop-connect DROPOUT --model-ema --model-ema-decay 0.9999 --aa original --vflip 0.5 --remode pixel --reprob 0 --amp --lr LEARNING-RATE --classification_layer_name 'classifier' --filter_bias_and_bn --pretrained --num-classes 9 --topk 2 --output $output --weighted_cross_entropy '29 8 10 106 6 2 40 1 100' --create_classifier_layerfc --scale 0.1 1.0 --eval-metric loss 
+python3 train.py $data_path --model MODEL-NAME -b $batchsize --sched step --epochs 450 --decay-rate 0.5 --opt nadam -j 8 --warmup-lr 1e-6 --weight-decay 0 --last_layer_weight_decay 0.0001 --drop DROPOUT --drop-connect DROPOUT --model-ema --model-ema-decay 0.9999 --aa ISIC2020 --vflip 0.5 --remode pixel --reprob 0 --lr LEARNING-RATE --classification_layer_name 'classifier' --filter_bias_and_bn --pretrained --num-classes 9 --topk 2 --output $output --create_classifier_layerfc --scale 0.1 1.0 --eval-metric loss --sampler ImbalancedDatasetSampler
 
 """
 
+# --weighted_cross_entropy '29 8 10 106 6 2 40 1 100' 
+# --amp
 
 os.chdir('/data/duongdb/pytorch-image-models/ISIC2019')
 
@@ -36,7 +41,7 @@ for script_base in script_base_array:
       fout.close() 
       #
       time.sleep(3)
-      os.system ( 'sbatch --partition=gpu --time=2-12:00:00 --gres=gpu:p100:1 --mem=5g -c6 ' + foutname ) # k80
+      os.system ( 'sbatch --partition=gpu --time=2-12:00:00 --gres=gpu:p100:1 --mem=6g -c8 ' + foutname ) # k80
 
      
 #

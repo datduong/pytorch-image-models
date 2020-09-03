@@ -193,7 +193,7 @@ def validate(args):
     if os.path.splitext(args.data)[1] == '.tar' and os.path.isfile(args.data):
         dataset = DatasetTar(args.data, load_bytes=args.tf_preprocessing, class_map=args.class_map)
     else:
-        dataset = Dataset(args.data, load_bytes=args.tf_preprocessing, class_map=args.class_map)
+        dataset = Dataset(args.data, load_bytes=args.tf_preprocessing, class_map=args.class_map, args=args)
 
     if args.valid_labels:
         with open(args.valid_labels, 'r') as f: # @valid_labels is index numbering

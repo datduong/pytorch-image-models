@@ -68,12 +68,13 @@ def create_optimizer(args, model, filter_bias_and_bn=True, classification_layer_
         # I don't believe they follow the paper or original Torch7 impl which schedules weight
         # decay based on the ratio of current_lr/initial_lr
         weight_decay /= args.lr
+
     if weight_decay and filter_bias_and_bn: # batch norm and bias params
         if classification_layer_name is not None : 
             parameters = set_lr_per_params (args, model, classification_layer_name, weight_decay)
         else: 
             parameters = add_weight_decay(model, weight_decay)
-        weight_decay = 0.
+        weight_decay = 0. # reset to 0
     else:
         if classification_layer_name is not None: 
             parameters = set_lr_per_params (args, model, classification_layer_name, weight_decay=0)

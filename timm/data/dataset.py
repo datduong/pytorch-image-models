@@ -14,6 +14,8 @@ import torch
 import tarfile
 from PIL import Image
 
+import cv2
+import numpy as np
 
 IMG_EXTENSIONS = ['.png', '.jpg', '.jpeg']
 
@@ -64,6 +66,7 @@ class Dataset(data.Dataset):
     def __init__(
             self,
             root,
+            args,
             load_bytes=False,
             transform=None,
             class_map=''):
@@ -81,12 +84,23 @@ class Dataset(data.Dataset):
         self.class_to_idx = class_to_idx
         self.load_bytes = load_bytes
         self.transform = transform
+        self.args = args 
 
     def __getitem__(self, index):
         path, target = self.samples[index]
-        img = open(path, 'rb').read() if self.load_bytes else Image.open(path).convert('RGB')
-        if self.transform is not None:
-            img = self.transform(img)
+
+        if self.args.aa == 'ISIC2020': # https://github.com/haqishen/SIIM-ISIC-Melanoma-Classification-1st-Place-Solution/blob/f4281317026f504384d68b2b8e344b1b295efa53/dataset.py#L26
+            image = cv2.imread(path)
+            image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+            res = self.transform(image=image)
+            image = res['image'].astype(np.float32)
+            image = image.transpose(2, 0, 1) # make it back to chanel x h x w
+            img = torch.tensor(image).float()
+        else: 
+            img = open(path, 'rb').read() if self.load_bytes else Image.open(path).convert('RGB') # [channels, height, width]
+            if self.transform is not None:
+                img = self.transform(img)
+                
         if target is None:
             target = torch.zeros(1).long()
         return img, target
