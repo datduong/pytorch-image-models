@@ -16,7 +16,7 @@ output=/data/duongdb/HAM10000dataset/TrainDevTestRandState1/MODEL-NAME/
 batchsize=64
 cd /data/duongdb/pytorch-image-models
 
-python3 train.py $data_path --model MODEL-NAME -b $batchsize --sched cosine --epochs 450 --decay-epochs 50 --decay-rate 0.8 --opt nadam -j 4 --warmup-lr 1e-6 --weight-decay 0 --drop DROPOUT --drop-connect DROPOUT --model-ema --model-ema-decay 0.9999 --lr LEARNING-RATE --filter_bias_and_bn --pretrained --num-classes 7 --topk 2 --output $output --scale 0.1 1.0 --eval-metric loss --amp --sampler ImbalancedDatasetSampler --aa original --img-size 450 --remode pixel --reprob 0.1
+python3 train.py $data_path --model MODEL-NAME -b $batchsize --sched cosine --epochs 450 --decay-epochs 50 --decay-rate 0.8 --opt nadam -j 8 --warmup-lr 1e-6 --weight-decay 0 --drop DROPOUT --drop-connect DROPOUT --model-ema --model-ema-decay 0.9999 --lr LEARNING-RATE --filter_bias_and_bn --pretrained --num-classes 7 --topk 2 --output $output --scale 0.1 1.0 --eval-metric loss --amp --sampler ImbalancedDatasetSampler --aa original --img-size 450 --remode pixel --reprob 0.1 --CUDA_VISIBLE_DEVICES 0,1
 
 """
 
@@ -57,10 +57,11 @@ for script_base in script_base_array:
       #
       time.sleep(3)
       if 'ISIC2020' in base2: 
-        os.system ( 'sbatch --partition=gpu --time=1-12:00:00 --gres=gpu:p100:1 --mem=6g -c4 ' + foutname ) # k80
+        os.system ( 'sbatch --partition=gpu --time=1-12:00:00 --gres=gpu:p100:1 --mem=6g -c8 ' + foutname ) # k80
       else: 
-        os.system ( 'sbatch --partition=gpu --time=1-12:00:00 --gres=gpu:p100:1 --mem=6g -c4 ' + foutname ) # k80
+        os.system ( 'sbatch --partition=gpu --time=1-12:00:00 --gres=gpu:p100:1 --mem=6g -c8 ' + foutname ) # k80
 
      
 #
 
+sbatch --partition=gpu --time=1-12:00:00 --gres=gpu:p100:2 --mem=6g -c8
