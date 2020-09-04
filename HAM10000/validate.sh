@@ -19,7 +19,9 @@ python3 validate_no_label.py $data_path --model efficientnet_b2 -b $batchsize -j
 # ! do test 
 
 sinteractive --partition=gpu --gres=gpu:p100:1 --mem=4g -c4
-module load python/3.7
+# module load python/3.7
+source /data/$USER/conda/etc/profile.d/conda.sh
+conda activate py37
 
 # data_path=/data/duongdb/HAM10000dataset/ImagesLabelFolderRandomSplit/ # train/valid
 data_path=/data/duongdb/HAM10000dataset/TrainDevTestRandState1/test
@@ -31,7 +33,7 @@ data_path=/data/duongdb/HAM10000dataset/TrainDevTestRandState1/test
 batchsize=32
 cd /data/duongdb/pytorch-image-models
 base_path=/data/duongdb/HAM10000dataset/TrainDevTestRandState1/efficientnet_b0/train #/data/duongdb/HAM10000dataset/efficientnet_b0/train
-train_name='20200901-180418-efficientnet_b0-224'
+train_name='20200903-213025-efficientnet_b0-224'
 
 # ! average check point 
 # python3 avg_checkpoints.py --input $base_path/$train_name --output $base_path/$train_name/averaged.pth
