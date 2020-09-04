@@ -22,9 +22,8 @@ def add_weight_decay(model, weight_decay=1e-5, skip_list=()):
             no_decay.append(param)
         else:
             decay.append(param)
-    return [
-        {'params': no_decay, 'weight_decay': 0.},
-        {'params': decay, 'weight_decay': weight_decay}]
+    return [    {'params': no_decay, 'weight_decay': 0.},
+                {'params': decay, 'weight_decay': weight_decay} ]
 
 
 def set_lr_per_params(args, model, last_layer_list, weight_decay=1e-5, skip_list=()): 

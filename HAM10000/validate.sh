@@ -18,7 +18,7 @@ python3 validate_no_label.py $data_path --model efficientnet_b2 -b $batchsize -j
 
 # ! do test 
 
-sinteractive --partition=gpu --gres=gpu:k80:1 --mem=4g -c4
+sinteractive --partition=gpu --gres=gpu:p100:1 --mem=4g -c4
 module load python/3.7
 
 # data_path=/data/duongdb/HAM10000dataset/ImagesLabelFolderRandomSplit/ # train/valid

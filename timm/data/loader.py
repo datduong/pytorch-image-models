@@ -193,9 +193,9 @@ def create_loader(
             separate=num_aug_splits > 0
         )
 
-    print('dataset data augmentation {}'.format(dataset.transform)) # ! just to doublecheck
+    print('dataset data augmentation\n {}\n'.format(dataset.transform)) # ! just to doublecheck
 
-    sampler = None
+    sampler = None # @loader_class # ! default setting, sampler=None & shuffle=False --> sequential sampler, else random sampler
     shuffle = is_training
     if args.sampler is None :
         if distributed:
@@ -208,11 +208,9 @@ def create_loader(
             #
         # ! when use distributed sampler cannot be "none"
         shuffle = sampler is None and is_training
-    elif args.sampler == 'ImbalancedDatasetSampler': 
-        if is_training :
-            # https://github.com/ufoym/imbalanced-dataset-sampler
-            sampler = ImbalancedDatasetSampler(dataset) # ValueError: sampler option is mutually exclusive with shuffle
-            shuffle = False
+    elif is_training and (args.sampler == 'ImbalancedDatasetSampler'): # ! imbal sampler on train set  
+        sampler = ImbalancedDatasetSampler(dataset) # https://github.com/ufoym/imbalanced-dataset-sampler
+        shuffle = False # must be false, or else ValueError: sampler option is mutually exclusive with shuffle
             
     print ('dataset sampler {}'.format(sampler))
           
