@@ -249,7 +249,7 @@ parser.add_argument("--create_classifier_layerfc", action='store_true', default=
                     help='add more layers to classification layer')
 parser.add_argument('--last_layer_weight_decay', type=float, default=0.0001,
                     help='weight decay in the last layer (default: 0.0001)') 
-parser.add_argument('--early_stop_counter', type=int, default=20,
+parser.add_argument('--early_stop_counter', type=int, default=100,
                     help='after we see best epoch, how many later epochs to wait before exit') 
 parser.add_argument('--topk', type=int, default=2,
                     help='highest topk')
@@ -541,7 +541,7 @@ def main():
 
     eval_metric = args.eval_metric
     best_metric = None
-    best_epoch = None
+    best_epoch = 0
     saver = None
     output_dir = ''
     if args.local_rank == 0:
