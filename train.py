@@ -354,15 +354,6 @@ def main():
         assert num_aug_splits > 1 or args.resplit
         model = convert_splitbn_model(model, max(num_aug_splits, 2))
 
-    if args.num_gpu > 1:
-        if args.amp:
-            _logger.warning(
-                'AMP does not work well with nn.DataParallel, disabling. Use distributed mode for multi-GPU AMP.')
-            args.amp = False
-        model = nn.DataParallel(model, device_ids=list(range(args.num_gpu))).cuda()
-    else:
-        model.cuda()
-
     # ! optimizer
     if args.classification_layer_name is not None: 
         args.classification_layer_name = args.classification_layer_name.strip().split()
@@ -371,12 +362,24 @@ def main():
 
     use_amp = False
     if has_apex and args.amp:
+        model.cuda()
         model, optimizer = amp.initialize(model, optimizer, opt_level='O1')
         use_amp = True
     if args.local_rank == 0:
         _logger.info('NVIDIA APEX {}. AMP {}.'.format(
             'installed' if has_apex else 'not installed', 'on' if use_amp else 'off'))
 
+    if args.num_gpu > 1: # ! these lines used to be above @optimizer, but we move it here, so that we override apex warning.
+        if args.amp:
+            _logger.warning(
+                'AMP does not work well with nn.DataParallel, disabling. Use distributed mode for multi-GPU AMP.')
+            _logger.warning(
+                '... we will ignore this ... .')
+            # args.amp = False
+        model = nn.DataParallel(model, device_ids=list(range(args.num_gpu))).cuda()
+    else:
+        model.cuda()
+        
     # optionally resume from a checkpoint
     resume_state = {}
     resume_epoch = None

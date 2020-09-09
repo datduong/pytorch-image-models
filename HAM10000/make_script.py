@@ -64,4 +64,7 @@ for script_base in script_base_array:
      
 #
 
-# sbatch --partition=gpu --time=1-12:00:00 --gres=gpu:p100:2 --mem=6g -c8 efficientnet_b3.20200904154748.sh
+# sbatch --partition=gpu --time=3-12:00:00 --gres=gpu:p100:2 --mem=4g -c8 efficientnet_b3.20200904154748.sh
+--resume /data/duongdb/HAM10000dataset/TrainDevTestRandState1/efficientnet_b3/train/20200904-220137-efficientnet_b3-450/last.pth.tar
+
+sbatch --partition=gpu --time=1-12:00:00 --gres=gpu:p100:1 --mem=4g -c8 efficientnet_b0.20200904205005.sh

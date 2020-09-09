@@ -5,7 +5,7 @@
 
 sinteractive --partition=gpu --gres=gpu:k80:1 --mem=4g -c4
 source /data/$USER/conda/etc/profile.d/conda.sh
-conda activate base
+conda activate py37
 
 # module load python/3.7
 
