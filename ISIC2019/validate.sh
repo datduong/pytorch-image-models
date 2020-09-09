@@ -18,7 +18,7 @@ base_path=/data/duongdb/ISIC2019-SkinCancer8Labels/TrainDevTestRandState1/effici
 # ! average check point 
 # python3 avg_checkpoints.py --input $base_path/$train_name --output $base_path/$train_name/averaged.pth
 
-train_name='20200901-185604-efficientnet_b0-224'
+train_name='20200908-205229-efficientnet_b0-224'
 output=$base_path/$train_name/result_test.csv # path/name.csv
 checkpoint=$base_path/$train_name/model_best.pth.tar # model_best.pth.tar averaged.pth 
 
