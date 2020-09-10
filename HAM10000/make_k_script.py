@@ -19,7 +19,7 @@ cd /data/duongdb/pytorch-image-models
 # python3 train.py $data_path --model efficientnet_b0 -b $batchsize --sched step --epochs 450 --decay-epochs 2.4 --decay-rate .97 --opt rmsproptf --opt-eps .001 -j 8 --warmup-lr 1e-6 --weight-decay 1e-5 --drop 0.3 --drop-connect 0.3 --model-ema --model-ema-decay 0.9999 --remode pixel --reprob 0.2 --amp --lr .048 --filter_bias_and_bn --pretrained --num-classes 7 --topk 2 --output $output --scale 0.1 1.0 --eval-metric loss --amp
 
 # ! loosely based on baseline in vienna 
-python3 train.py --num-gpu 3 $data_path --model MODEL-NAME -b $batchsize --sched cosine --epochs 850 --decay-epochs 50 --decay-rate 0.8 --opt nadam -j 8 --warmup-lr 1e-6 --weight-decay 0 --drop 0.3 --drop-connect 0.3 --model-ema --model-ema-decay 0.9999 --lr 0.0001 --filter_bias_and_bn --pretrained --num-classes 7 --topk 2 --output $output --scale 0.1 1.0 --eval-metric loss --amp --img-size 450 --remode pixel --reprob 0.1"""
+python3 train.py --num-gpu 3 $data_path --model MODEL-NAME -b $batchsize --sched cosine --epochs 850 --decay-epochs 50 --decay-rate 0.8 --opt nadam -j 8 --warmup-lr 1e-6 --weight-decay 0 --drop 0.3 --drop-connect 0.3 --model-ema --model-ema-decay 0.9999 --lr 0.0001 --filter_bias_and_bn --pretrained --num-classes 7 --topk 2 --output $output --scale 0.1 1.0 --eval-metric loss --amp --img-size 450 --remode pixel --reprob 0.1 --crop-pct 0.922"""
 
 
 os.chdir('/data/duongdb/HAM10000dataset/TrainDevTestRandState1/our-setting/')
@@ -31,7 +31,7 @@ case = {1: ' --aa ISIC2020 ',
 
 
 
-for modelname in ['efficientnet_b4']: 
+for modelname in ['tf_efficientnet_b4_ns']: 
   for k, val in case.items() : 
     if k not in [2]: # ! what to skip ?
       continue
