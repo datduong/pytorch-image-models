@@ -20,7 +20,7 @@ checkpoint=$base_path/$train_name/model_best.pth.tar # model_best.pth.tar averag
 
 batchsize=64
 cd /data/duongdb/pytorch-image-models
-python3 validate_no_label.py $data_path --model MODEL_NAME -b $batchsize -j 2 --config $base_path/$train_name/args.yaml --num-classes 9 --results-file $output --checkpoint $checkpoint --amp --use-ema --no-test-pool --has_eval_label
+python3 validate_no_label.py $data_path --model MODEL_NAME -b $batchsize -j 2 --config $base_path/$train_name/args.yaml --num-classes 9 --results-file $output --checkpoint $checkpoint --amp --use-ema --no-test-pool --has_eval_label --crop-pct 0.922
 
 """
 
@@ -29,9 +29,13 @@ os.chdir('/data/duongdb/ISIC2019-SkinCancer8Labels/TrainDevTestRandState1/our-se
 case = {1: '20200909-155811-efficientnet_b0-450', 
         2: '20200909-155813-efficientnet_b1-450',
         3: '20200909-155809-efficientnet_b2-450', 
-        4: '20200909-155808-efficientnet_b3-450'}
+        4: '20200909-155808-efficientnet_b3-450', 
+        5: '20200910-175136-tf_efficientnet_b4_ns-450' # --crop-pct 0.922
+        }
 
 for k, val in case.items() : 
+	if k not in [5]: 
+		continue
 	base2 = re.sub('TRAIN_NAME', '2/train/'+val, base) # train/
 	base2 = re.sub('MODEL_NAME', val.split('-')[2], base2) # get name
 	foutname = str(k)+'.'+val+'.sh'
