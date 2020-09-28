@@ -2,6 +2,17 @@
 
 ## What's New
 
+### Sept 18, 2020
+* New ResNet 'D' weights. 72.7 (top-1) ResNet-18-D, 77.1 ResNet-34-D, 80.5 ResNet-50-D
+* Added a few untrained defs for other ResNet models (66D, 101D, 152D, 200/200D)
+
+### Sept 3, 2020
+* New weights
+  * Wide-ResNet50 - 81.5 top-1 (vs 78.5 torchvision)
+  * SEResNeXt50-32x4d - 81.3 top-1 (vs 79.1 cadene)
+* Support for native Torch AMP and channels_last memory format added to train/validate scripts (`--channels-last`, `--native-amp` vs `--apex-amp`)
+* Models tested with channels_last on latest NGC 20.08 container. AdaptiveAvgPool in attn layers changed to mean((2,3)) to work around bug with NHWC kernel.
+
 ### Aug 12, 2020
 * New/updated weights from training experiments
   * EfficientNet-B3 - 82.1 top-1 (vs 81.6 for official with AA and 81.9 for AdvProp)
@@ -174,3 +185,35 @@ See the [documentation](https://rwightman.github.io/pytorch-image-models/)
 ## Train, Validation, Inference Scripts
 
 The root folder of the repository contains reference train, validation, and inference scripts that work with the included models and other features of this repository. They are adaptable for other datasets and use cases with a little hacking. See [documentation](https://rwightman.github.io/pytorch-image-models/scripts/) for some basics and [training hparams](https://rwightman.github.io/pytorch-image-models/training_hparam_examples) for some train examples that produce SOTA ImageNet results.
+
+## Awesome PyTorch Resources
+
+One of the greatest assets of PyTorch is the community and their contributions. A few of my favourite resources that pair well with the models and componenets here are listed below.
+
+### Training / Frameworks
+* PyTorch Lightning - https://github.com/PyTorchLightning/pytorch-lightning
+* fastai - https://github.com/fastai/fastai
+
+### Computer Vision / Image Augmentation
+* Albumentations - https://github.com/albumentations-team/albumentations
+* Kornia - https://github.com/kornia/kornia
+
+### Metric Learning
+* PyTorch Metric Learning - https://github.com/KevinMusgrave/pytorch-metric-learning
+
+### Object Detection, Instance and Semantic Segmentation
+* Detectron2 - https://github.com/facebookresearch/detectron2
+* Segmentation Models (Semantic) - https://github.com/qubvel/segmentation_models.pytorch/issues
+* EfficientDet (Obj Det, Semantic soon) - https://github.com/rwightman/efficientdet-pytorch
+
+## Licenses
+
+### Code
+The code here is licensed Apache 2.0. I've taken care to make sure any third party code included or adapted has compatible (permissive) licenses such as MIT, BSD, etc. I've made an effort to avoid any GPL / LGPL conflicts. That said, it is your responsibility to ensure you comply with license here and conditions of any dependent licenses. Where applicable, I've linked the sources/references for various components in docstrings. If you think I've missed anything please create an issue.
+
+### Pretrained Weights
+So far all of the pretrained weights available here are pretrained on ImageNet with a select few that have some additional pretraining (see extra note below). ImageNet was released for non-commercial research purposes only (http://www.image-net.org/download-faq). It's not clear what the implications of that are for the use of pretrained weights from that dataset. Any models I have trained with ImageNet are done for research purposes and one should assume that the original dataset license applies to the weights. It's best to seek legal advice if you intend to use the pretrained weights in a commercial product.
+
+#### Pretrained on more than ImageNet
+Several weights included or references here were pretrained with proprietary datasets that I do not have access to. These include the Facebook WSL, SSL, SWSL ResNe(Xt) and the Google Noisy Student EfficientNet models. The Facebook models have an explicit non-commercial license (CC-BY-NC 4.0, https://github.com/facebookresearch/semi-supervised-ImageNet1K-models, https://github.com/facebookresearch/WSL-Images). The Google models do not appear to have any restriction beyond the Apache 2.0 license (and ImageNet concerns). In either case, you should contact Facebook or Google with any questions.
+

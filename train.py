@@ -17,16 +17,16 @@ Hacked together by / Copyright 2020 Ross Wightman (https://github.com/rwightman)
 import argparse
 import time
 import yaml
+import os
+import logging
+from collections import OrderedDict
+from contextlib import suppress
 from datetime import datetime
 
-try:
-    from apex import amp
-    from apex.parallel import DistributedDataParallel as DDP
-    from apex.parallel import convert_syncbn_model
-    has_apex = True
-except ImportError:
-    from torch.nn.parallel import DistributedDataParallel as DDP
-    has_apex = False
+import torch
+import torch.nn as nn
+import torchvision.utils
+from torch.nn.parallel import DistributedDataParallel as NativeDDP
 
 from timm.data import Dataset, create_loader, resolve_data_config, Mixup, FastCollateMixup, AugMixDataset
 from timm.models import create_model, resume_checkpoint, convert_splitbn_model
@@ -36,15 +36,26 @@ from timm.utils import *
 from timm.loss import LabelSmoothingCrossEntropy, SoftTargetCrossEntropy, JsdCrossEntropy
 from timm.optim import create_optimizer
 from timm.scheduler import create_scheduler
+from timm.utils import ApexScaler, NativeScaler
 
-import torch
-import torch.nn as nn
-import torchvision.utils
+try:
+    from apex import amp
+    from apex.parallel import DistributedDataParallel as ApexDDP
+    from apex.parallel import convert_syncbn_model
+    has_apex = True
+except ImportError:
+    has_apex = False
+
+has_native_amp = False
+try:
+    if getattr(torch.cuda.amp, 'autocast') is not None:
+        has_native_amp = True
+except AttributeError:
+    pass
 
 
 torch.backends.cudnn.benchmark = True
 _logger = logging.getLogger('train')
-
 
 # The first arg parser parses out only the --config argument, this argument is used to
 # load a yaml file containing key-values that override the defaults for the main parser below
@@ -70,8 +81,8 @@ parser.add_argument('--no-resume-opt', action='store_true', default=False,
                     help='prevent resume of optimizer state when resuming model')
 parser.add_argument('--num-classes', type=int, default=1000, metavar='N',
                     help='number of label classes (default: 1000)')
-parser.add_argument('--gp', default='avg', type=str, metavar='POOL',
-                    help='Type of global pool, "avg", "max", "avgmax", "avgmaxc" (default: "avg")')
+parser.add_argument('--gp', default=None, type=str, metavar='POOL',
+                    help='Global pool type, one of (fast, avg, max, avgmax, avgmaxc). Model default if None.')
 parser.add_argument('--img-size', type=int, default=None, metavar='N',
                     help='Image patch size (default: None => model default)')
 parser.add_argument('--crop-pct', default=None, type=float,
@@ -168,8 +179,8 @@ parser.add_argument('--mixup-prob', type=float, default=1.0,
                     help='Probability of performing mixup or cutmix when either/both is enabled')
 parser.add_argument('--mixup-switch-prob', type=float, default=0.5,
                     help='Probability of switching to cutmix when both mixup and cutmix enabled')
-parser.add_argument('--mixup-elem', action='store_true', default=False,
-                    help='Apply mixup/cutmix params uniquely per batch element instead of per batch.')
+parser.add_argument('--mixup-mode', type=str, default='batch',
+                    help='How to apply mixup/cutmix params. Per "batch", "pair", or "elem"')
 parser.add_argument('--mixup-off-epoch', default=0, type=int, metavar='N',
                     help='Turn off mixup after this epoch, disabled if 0 (default: 0)')
 parser.add_argument('--smoothing', type=float, default=0.1,
@@ -221,7 +232,13 @@ parser.add_argument('--num-gpu', type=int, default=1,
 parser.add_argument('--save-images', action='store_true', default=False,
                     help='save images of input bathes every log interval for debugging')
 parser.add_argument('--amp', action='store_true', default=False,
-                    help='use NVIDIA amp for mixed precision training')
+                    help='use NVIDIA Apex AMP or Native AMP for mixed precision training')
+parser.add_argument('--apex-amp', action='store_true', default=False,
+                    help='Use NVIDIA Apex AMP mixed precision')
+parser.add_argument('--native-amp', action='store_true', default=False,
+                    help='Use Native Torch AMP mixed precision')
+parser.add_argument('--channels-last', action='store_true', default=False,
+                    help='Use channels_last memory layout')
 parser.add_argument('--pin-mem', action='store_true', default=False,
                     help='Pin CPU memory in DataLoader for more efficient (sometimes) transfer to GPU.')
 parser.add_argument('--no-prefetcher', action='store_true', default=False,
@@ -284,7 +301,8 @@ def main():
     if 'WORLD_SIZE' in os.environ:
         args.distributed = int(os.environ['WORLD_SIZE']) > 1
         if args.distributed and args.num_gpu > 1:
-            _logger.warning('Using more than one GPU per process in distributed mode is not allowed. Setting num_gpu to 1.')
+            _logger.warning(
+                'Using more than one GPU per process in distributed mode is not allowed.Setting num_gpu to 1.')
             args.num_gpu = 1
 
     args.device = 'cuda:0'
@@ -354,20 +372,55 @@ def main():
         assert num_aug_splits > 1 or args.resplit
         model = convert_splitbn_model(model, max(num_aug_splits, 2))
 
+    use_amp = None
+    if args.amp:
+        # for backwards compat, `--amp` arg tries apex before native amp
+        if has_apex:
+            args.apex_amp = True
+        elif has_native_amp:
+            args.native_amp = True
+    if args.apex_amp and has_apex:
+        use_amp = 'apex'
+    elif args.native_amp and has_native_amp:
+        use_amp = 'native'
+    elif args.apex_amp or args.native_amp:
+        _logger.warning("Neither APEX or native Torch AMP is available, using float32. "
+                        "Install NVIDA apex or upgrade to PyTorch 1.6")
+
+    if args.num_gpu > 1:
+        if use_amp == 'apex':
+            _logger.warning(
+                'Apex AMP does not work well with nn.DataParallel, disabling. Use DDP or Torch AMP.')
+            use_amp = None
+        model = nn.DataParallel(model, device_ids=list(range(args.num_gpu))).cuda()
+        assert not args.channels_last, "Channels last not supported with DP, use DDP."
+    else:
+        model.cuda()
+        if args.channels_last:
+            model = model.to(memory_format=torch.channels_last)
+
+    optimizer = create_optimizer(args, model)
     # ! optimizer
-    if args.classification_layer_name is not None: 
+    if args.classification_layer_name is not None: # ! add our own classification layer... doesn't really improve very much though...
         args.classification_layer_name = args.classification_layer_name.strip().split()
         print ('classification_layer_name {}'.format(args.classification_layer_name))
-    optimizer = create_optimizer(args, model, filter_bias_and_bn=args.filter_bias_and_bn, classification_layer_name=args.classification_layer_name)
+        optimizer = create_optimizer(args, model, filter_bias_and_bn=args.filter_bias_and_bn, classification_layer_name=args.classification_layer_name)
 
-    use_amp = False
-    if has_apex and args.amp:
-        model.cuda()
+    amp_autocast = suppress  # do nothing
+    loss_scaler = None
+    if use_amp == 'apex':
         model, optimizer = amp.initialize(model, optimizer, opt_level='O1')
-        use_amp = True
-    if args.local_rank == 0:
-        _logger.info('NVIDIA APEX {}. AMP {}.'.format(
-            'installed' if has_apex else 'not installed', 'on' if use_amp else 'off'))
+        loss_scaler = ApexScaler()
+        if args.local_rank == 0:
+            _logger.info('Using NVIDIA APEX AMP. Training in mixed precision.')
+    elif use_amp == 'native':
+        amp_autocast = torch.cuda.amp.autocast
+        loss_scaler = NativeScaler()
+        if args.local_rank == 0:
+            _logger.info('Using native Torch AMP. Training in mixed precision.')
+    else:
+        if args.local_rank == 0:
+            _logger.info('AMP not enabled. Training in float32.')
 
     if args.num_gpu > 1: # ! these lines used to be above @optimizer, but we move it here, so that we override apex warning.
         if args.amp:
@@ -381,20 +434,13 @@ def main():
         model.cuda()
         
     # optionally resume from a checkpoint
-    resume_state = {}
     resume_epoch = None
     if args.resume:
-        resume_state, resume_epoch = resume_checkpoint(model, args.resume)
-    if resume_state and not args.no_resume_opt:
-        if 'optimizer' in resume_state:
-            if args.local_rank == 0:
-                _logger.info('Restoring Optimizer state from checkpoint')
-            optimizer.load_state_dict(resume_state['optimizer'])
-        if use_amp and 'amp' in resume_state and 'load_state_dict' in amp.__dict__:
-            if args.local_rank == 0:
-                _logger.info('Restoring NVIDIA AMP state from checkpoint')
-            amp.load_state_dict(resume_state['amp'])
-    del resume_state
+        resume_epoch = resume_checkpoint(
+            model, args.resume,
+            optimizer=None if args.no_resume_opt else optimizer,
+            loss_scaler=None if args.no_resume_opt else loss_scaler,
+            log_info=args.local_rank == 0)
 
     model_ema = None
     if args.model_ema:
@@ -409,7 +455,8 @@ def main():
         if args.sync_bn:
             assert not args.split_bn
             try:
-                if has_apex:
+                if has_apex and use_amp != 'native':
+                    # Apex SyncBN preferred unless native amp is activated
                     model = convert_syncbn_model(model)
                 else:
                     model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
@@ -419,12 +466,15 @@ def main():
                         'zero initialized BN layers (enabled by default for ResNets) while sync-bn enabled.')
             except Exception as e:
                 _logger.error('Failed to enable Synchronized BatchNorm. Install Apex or Torch >= 1.1')
-        if has_apex:
-            model = DDP(model, delay_allreduce=True)
+        if has_apex and use_amp != 'native':
+            # Apex DDP preferred unless native amp is activated
+            if args.local_rank == 0:
+                _logger.info("Using NVIDIA APEX DistributedDataParallel.")
+            model = ApexDDP(model, delay_allreduce=True)
         else:
             if args.local_rank == 0:
-                _logger.info("Using torch DistributedDataParallel. Install NVIDIA Apex for Apex DDP.")
-            model = DDP(model, device_ids=[args.local_rank])  # can use device str in Torch >= 1.1
+                _logger.info("Using native Torch DistributedDataParallel.")
+            model = NativeDDP(model, device_ids=[args.local_rank])  # can use device str in Torch >= 1.1
         # NOTE: EMA model does not need to be wrapped by DDP
 
     lr_scheduler, num_epochs = create_scheduler(args, optimizer)
@@ -452,7 +502,7 @@ def main():
     if mixup_active:
         mixup_args = dict(
             mixup_alpha=args.mixup, cutmix_alpha=args.cutmix, cutmix_minmax=args.cutmix_minmax,
-            prob=args.mixup_prob, switch_prob=args.mixup_switch_prob, elementwise=args.mixup_elem,
+            prob=args.mixup_prob, switch_prob=args.mixup_switch_prob, mode=args.mixup_mode,
             label_smoothing=args.smoothing, num_classes=args.num_classes)
         if args.prefetcher:
             assert not num_aug_splits  # collate conflict (need to support deinterleaving in collate mixup)
@@ -556,7 +606,9 @@ def main():
         ])
         output_dir = get_outdir(output_base, 'train', exp_name)
         decreasing = True if eval_metric == 'loss' else False
-        saver = CheckpointSaver(checkpoint_dir=output_dir, decreasing=decreasing, max_history=5)
+        saver = CheckpointSaver(
+            model=model, optimizer=optimizer, args=args, model_ema=model_ema, amp_scaler=loss_scaler,
+            checkpoint_dir=output_dir, recovery_dir=output_dir, decreasing=decreasing)
         with open(os.path.join(output_dir, 'args.yaml'), 'w') as f:
             f.write(args_text)
 
@@ -568,21 +620,20 @@ def main():
             train_metrics = train_epoch(
                 epoch, model, loader_train, optimizer, train_loss_fn, args,
                 lr_scheduler=lr_scheduler, saver=saver, output_dir=output_dir,
-                use_amp=use_amp, model_ema=model_ema, mixup_fn=mixup_fn)
+                amp_autocast=amp_autocast, loss_scaler=loss_scaler, model_ema=model_ema, mixup_fn=mixup_fn)
 
             if args.distributed and args.dist_bn in ('broadcast', 'reduce'):
                 if args.local_rank == 0:
                     _logger.info("Distributing BatchNorm running means and vars")
                 distribute_bn(model, args.world_size, args.dist_bn == 'reduce')
 
-            eval_metrics = validate(model, loader_eval, validate_loss_fn, args)
+            eval_metrics = validate(model, loader_eval, validate_loss_fn, args, amp_autocast=amp_autocast)
 
             if model_ema is not None and not args.model_ema_force_cpu:
                 if args.distributed and args.dist_bn in ('broadcast', 'reduce'):
                     distribute_bn(model_ema, args.world_size, args.dist_bn == 'reduce')
-
                 ema_eval_metrics = validate(
-                    model_ema.ema, loader_eval, validate_loss_fn, args, log_suffix=' (EMA)')
+                    model_ema.ema, loader_eval, validate_loss_fn, args, amp_autocast=amp_autocast, log_suffix=' (EMA)')
                 eval_metrics = ema_eval_metrics
 
             if lr_scheduler is not None:
@@ -596,9 +647,7 @@ def main():
             if saver is not None:
                 # save proper checkpoint with eval metric
                 save_metric = eval_metrics[eval_metric]
-                best_metric, best_epoch = saver.save_checkpoint(
-                    model, optimizer, args,
-                    epoch=epoch, model_ema=model_ema, metric=save_metric, use_amp=use_amp)
+                best_metric, best_epoch = saver.save_checkpoint(epoch, metric=save_metric)
 
             # early stop
             if epoch - best_epoch > args.early_stop_counter : 
@@ -614,7 +663,8 @@ def main():
 
 def train_epoch(
         epoch, model, loader, optimizer, loss_fn, args,
-        lr_scheduler=None, saver=None, output_dir='', use_amp=False, model_ema=None, mixup_fn=None):
+        lr_scheduler=None, saver=None, output_dir='', amp_autocast=suppress,
+        loss_scaler=None, model_ema=None, mixup_fn=None):
 
     if args.mixup_off_epoch and epoch >= args.mixup_off_epoch:
         if args.prefetcher and loader.mixup_enabled:
@@ -638,8 +688,12 @@ def train_epoch(
             input, target = input.cuda(), target.cuda()
             if mixup_fn is not None:
                 input, target = mixup_fn(input, target)
+        if args.channels_last:
+            input = input.contiguous(memory_format=torch.channels_last)
 
-        output = model(input)
+        with amp_autocast():
+            output = model(input)
+            loss = loss_fn(output, target)
 
         # ! for inception, or any type of aux loss 
         if isinstance(output, tuple): # training has aux loss (note, this was not implemented in many pytorch code, only torchvision)
@@ -652,12 +706,11 @@ def train_epoch(
             losses_m.update(loss.item(), input.size(0))
 
         optimizer.zero_grad()
-        if use_amp:
-            with amp.scale_loss(loss, optimizer) as scaled_loss:
-                scaled_loss.backward()
+        if loss_scaler is not None:
+            loss_scaler(loss, optimizer)
         else:
             loss.backward()
-        optimizer.step()
+            optimizer.step()
 
         torch.cuda.synchronize()
         if model_ema is not None:
@@ -700,8 +753,7 @@ def train_epoch(
 
         if saver is not None and args.recovery_interval and (
                 last_batch or (batch_idx + 1) % args.recovery_interval == 0):
-            saver.save_recovery(
-                model, optimizer, args, epoch, model_ema=model_ema, use_amp=use_amp, batch_idx=batch_idx)
+            saver.save_recovery(epoch, batch_idx=batch_idx)
 
         if lr_scheduler is not None:
             lr_scheduler.step_update(num_updates=num_updates, metric=losses_m.avg)
@@ -715,7 +767,7 @@ def train_epoch(
     return OrderedDict([('loss', losses_m.avg)])
 
 
-def validate(model, loader, loss_fn, args, log_suffix=''):
+def validate(model, loader, loss_fn, args, amp_autocast=suppress, log_suffix=''):
     batch_time_m = AverageMeter()
     losses_m = AverageMeter()
     top1_m = AverageMeter()
@@ -731,8 +783,11 @@ def validate(model, loader, loss_fn, args, log_suffix=''):
             if not args.prefetcher:
                 input = input.cuda()
                 target = target.cuda()
+            if args.channels_last:
+                input = input.contiguous(memory_format=torch.channels_last)
 
-            output = model(input)
+            with amp_autocast():
+                output = model(input)
             if isinstance(output, (tuple, list)):
                 output = output[0]
 
